@@ -1,0 +1,33 @@
+@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom reusable styles */
+.btn {
+    @apply px-4 py-2 rounded-lg font-medium transition;
+}
+
+.btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700;
+}
+
+.card {
+    @apply bg-white rounded-xl shadow-md p-4;
+}
+
+.badge {
+    @apply px-2 py-1 text-xs rounded-full font-medium;
+}
+
+.badge-success {
+    @apply bg-green-100 text-green-600;
+}
+
+.badge-warning {
+    @apply bg-yellow-100 text-yellow-600;
+}
+
+.badge-danger {
+    @apply bg-red-100 text-red-600;
+}
