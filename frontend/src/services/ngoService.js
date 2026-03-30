@@ -1,6 +1,6 @@
 import apiClient from '../lib/axios';
 
-const API_BASE = '/api/ngo';
+const API_BASE = '/ngo';
 
 export const ngoService = {
   /**

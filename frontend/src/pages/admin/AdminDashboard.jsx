@@ -4,14 +4,12 @@ import Badge from "../../components/ui/Badge";
 import { LayoutDashboard, Target, Users, Coins, CheckSquare, Clock, ChevronRight } from "lucide-react";
 import { useCampaigns } from "../../hooks/useCampaigns";
 import { useAdminProofs } from "../../hooks/useProofs";
-import { useDonations } from "../../hooks/useDonations";
 import { useState, useEffect } from "react";
 import adminFundsService from "../../services/adminFundsService";
 
 function AdminDashboard() {
     const { data: campaignsData, isLoading: campaignsLoading } = useCampaigns({ perPage: 200 });
     const { data: proofsData, isLoading: proofsLoading } = useAdminProofs({ status: "pending" });
-    const { data: donationsData, isLoading: donationsLoading } = useDonations({ perPage: 200 });
 
     const [contractBalance, setContractBalance] = useState(null);
     const [balanceLoading, setBalanceLoading] = useState(true);
@@ -20,12 +18,19 @@ function AdminDashboard() {
 
     const campaigns = campaignsData?.items || [];
     const proofs = proofsData?.data || [];
-    const donations = donationsData?.items || [];
 
     const activeCampaigns = campaigns.filter((c) => c.status === "published").length;
-    const totalFunds = donations
-        .filter((d) => d.status === "confirmed")
-        .reduce((sum, d) => sum + Number(d.amount || 0), 0);
+
+    const onchainBalanceEth = Number(contractBalance?.balanceEth || 0);
+
+    function formatEthBalance(value) {
+        const amount = Number(value || 0);
+        if (!Number.isFinite(amount)) return "0.0000";
+        if (amount === 0) return "0.0000";
+        if (amount < 0.0001) return amount.toFixed(8);
+        if (amount < 1) return amount.toFixed(4);
+        return amount.toFixed(2);
+    }
 
     useEffect(() => {
         const fetchContractBalance = async () => {
@@ -109,9 +114,11 @@ function AdminDashboard() {
                     </div>
                     <h3 className="text-slate-500 font-semibold text-sm uppercase tracking-wider">Smart Contract Balance</h3>
                     <p className="text-4xl font-extrabold mt-2 text-slate-800 tracking-tight">
-                        {balanceLoading ? "..." : `${Number(contractBalance?.balanceEth || 0).toFixed(2)} ETH`}
+                        {balanceLoading ? "..." : `${formatEthBalance(onchainBalanceEth)} ETH`}
                     </p>
-                    <p className="text-xs text-slate-500 mt-2">Real blockchain balance</p>
+                    <p className="text-xs text-slate-500 mt-2">
+                        Real blockchain balance
+                    </p>
                     <div className="absolute -bottom-4 -right-4 text-emerald-50/50 group-hover:scale-110 transition-transform duration-500">
                         <Coins size={120} />
                     </div>
@@ -161,7 +168,7 @@ function AdminDashboard() {
                                     <div className="text-right">
                                         <p className="text-2xl font-bold text-indigo-600">
                                             {typeof campaign.contractBalanceEth === 'string' && campaign.contractBalanceEth !== 'N/A'
-                                                ? Number(campaign.contractBalanceEth).toFixed(2)
+                                                ? formatEthBalance(campaign.contractBalanceEth)
                                                 : campaign.contractBalanceEth} ETH
                                         </p>
                                         <p className="text-xs text-slate-500">Locked in Contract</p>
@@ -174,11 +181,11 @@ function AdminDashboard() {
                                     </div>
                                     <div>
                                         <p className="text-xs text-slate-500 uppercase tracking-wider">Locked (Pending)</p>
-                                        <p className="text-lg font-semibold text-amber-600">₹{(campaign.lockedFunds || 0).toLocaleString()}</p>
+                                        <p className="text-lg font-semibold text-amber-600">{formatEthBalance(campaign.lockedFundsEth)} ETH</p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-slate-500 uppercase tracking-wider">Released</p>
-                                        <p className="text-lg font-semibold text-green-600">₹{(campaign.releasedFunds || 0).toLocaleString()}</p>
+                                        <p className="text-lg font-semibold text-green-600">{formatEthBalance(campaign.releasedFundsEth)} ETH</p>
                                     </div>
                                 </div>
                             </Card>

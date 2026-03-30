@@ -51,10 +51,16 @@ function Campaigns() {
         navigate(`/ngo/campaigns/${id}/edit`);
     }
 
+    const formatEth = (value) => {
+        const amount = Number(value || 0);
+        if (!Number.isFinite(amount)) return "0.0000 ETH";
+        return `${amount.toFixed(4)} ETH`;
+    };
+
     const rows = (data?.items || []).map((item) => [
         <span className="font-bold text-slate-800">{item.title}</span>,
-        <span className="font-medium text-slate-600">₹{Number(item.fundingGoal || 0).toLocaleString()}</span>,
-        <span className="font-bold text-slate-600">₹0</span>,
+        <span className="font-medium text-slate-600">{formatEth(item.fundingGoalETH)}</span>,
+        <span className="font-bold text-slate-600">{formatEth(item.raisedETH)}</span>,
         <Badge
             label={item.status}
             type={item.status === "published" ? "success" : item.status === "completed" ? "default" : "warning"}
@@ -88,7 +94,7 @@ function Campaigns() {
                 </h1>
                 <p className="text-slate-500 mt-2 font-medium">Track your organization's ongoing and completed campaigns.</p>
             </div>
-            
+
             <Card className="p-0 overflow-hidden">
                 {actionError && (
                     <div className="mx-6 mt-5 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3">

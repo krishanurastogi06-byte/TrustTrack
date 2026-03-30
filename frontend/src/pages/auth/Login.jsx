@@ -46,10 +46,14 @@ function Login() {
         }
 
         if (mode === "register" && role === "ngo") {
-            const validWallet = /^0x[a-fA-F0-9]{40}$/.test(walletAddress.trim());
-            if (!validWallet) {
-                setError("Valid NGO wallet address is required.");
-                return;
+            const trimmedWallet = walletAddress.trim();
+            // Only validate if wallet address is provided
+            if (trimmedWallet) {
+                const validWallet = /^0x[a-fA-F0-9]{40}$/.test(trimmedWallet);
+                if (!validWallet) {
+                    setError("Valid NGO wallet address format: 0x followed by 40 hexadecimal characters.");
+                    return;
+                }
             }
         }
 
@@ -193,10 +197,10 @@ function Login() {
 
                         {mode === "register" && role === "ngo" && (
                             <div className="space-y-2">
-                                <label className="text-sm font-bold text-slate-700 ml-1">NGO Wallet Address</label>
+                                <label className="text-sm font-bold text-slate-700 ml-1">NGO Wallet Address <span className="text-xs font-normal text-slate-500">(Optional)</span></label>
                                 <input
                                     type="text"
-                                    placeholder="0x..."
+                                    placeholder="0x... (leave empty to add later from dashboard)"
                                     className="w-full border border-slate-200 bg-slate-50 px-5 py-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700 font-semibold placeholder:font-medium placeholder:text-slate-400"
                                     value={walletAddress}
                                     onChange={(e) => setWalletAddress(e.target.value)}

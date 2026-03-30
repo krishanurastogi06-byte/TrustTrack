@@ -7,6 +7,8 @@ import { useCampaign, useCampaignMilestones } from "../../hooks/useCampaigns";
 import DonateWithWallet from "../../components/ui/DonateWithWallet";
 import donationAbi from "../../lib/contracts/donationAbi.json";
 
+const INR_PER_ETH = 250000;
+
 function CampaignDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -39,8 +41,12 @@ function CampaignDetails() {
         );
     }
 
-    const contractAddress = import.meta.env.VITE_DONATION_CONTRACT;
+    const contractAddress = data?.contractAddress || import.meta.env.VITE_DONATION_CONTRACT;
     const coverImage = campaign.coverImage || "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=1200";
+    const fundingGoalEth = Number(campaign.fundingGoalETH || (Number(campaign.fundingGoalINR || campaign.fundingGoal || 0) / INR_PER_ETH));
+    const raisedEth = Number(campaign.raisedETH || 0);
+    const remainingEth = Math.max(0, fundingGoalEth - raisedEth);
+    const fundedPercentage = fundingGoalEth > 0 ? Math.min((raisedEth / fundingGoalEth) * 100, 100) : 0;
 
     return (
         <div className="max-w-5xl mx-auto w-full">
@@ -117,17 +123,24 @@ function CampaignDetails() {
                         <div className="mb-6">
                             <p className="font-bold text-sm text-slate-500 uppercase tracking-wider mb-2">Funds Raised</p>
                             <div className="flex items-baseline gap-2 mb-2">
-                                <span className="text-4xl font-extrabold text-slate-800 tracking-tight">₹0</span>
-                                <span className="text-slate-500 font-medium tracking-tight">/ ₹{Number(campaign.fundingGoal || 0).toLocaleString()}</span>
+                                <span className="text-4xl font-extrabold text-slate-800 tracking-tight">{raisedEth.toFixed(4)} ETH</span>
+                                <span className="text-slate-500 font-medium tracking-tight">/ {fundingGoalEth.toFixed(4)} ETH</span>
                             </div>
                             <div className="w-full bg-slate-200 rounded-full h-2.5 mb-2">
-                                <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: '0%' }}></div>
+                                <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${fundedPercentage}%` }}></div>
                             </div>
-                            <p className="text-sm font-semibold text-slate-600">0% funded</p>
+                            <p className="text-sm font-semibold text-slate-600">{fundedPercentage.toFixed(2)}% funded</p>
                         </div>
 
                         <div className="space-y-4">
-                            <DonateWithWallet contractAddress={contractAddress} abi={donationAbi} campaignId={campaign._id} />
+                            <DonateWithWallet
+                                contractAddress={contractAddress}
+                                abi={donationAbi}
+                                campaignId={campaign._id}
+                                contractCampaignId={campaign.contractCampaignId}
+                                remainingEth={remainingEth}
+                                onDonationConfirmed={() => refetch()}
+                            />
                         </div>
                     </div>
                 </div>

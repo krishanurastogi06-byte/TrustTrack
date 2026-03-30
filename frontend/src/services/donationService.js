@@ -15,8 +15,14 @@ export async function createDonation(payload) {
   return res.data;
 }
 
+export async function confirmDonation(payload) {
+  const res = await api.post("/donations/confirm", payload);
+  return res.data;
+}
+
 export default {
   fetchDonations,
   fetchDonationById,
   createDonation,
+  confirmDonation,
 };

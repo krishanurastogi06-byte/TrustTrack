@@ -1,6 +1,6 @@
 import apiClient from '../lib/axios';
 
-const API_BASE = '/api/admin';
+const API_BASE = '/admin';
 
 export const adminFundsService = {
   /**

@@ -1,6 +1,8 @@
 const Proof = require('../models/Proof');
 const Milestone = require('../models/Milestone');
 const Campaign = require('../models/Campaign');
+const Donation = require('../models/Donation');
+const Transaction = require('../models/Transaction');
 const { success, fail } = require('../lib/apiResponse');
 const ngoService = require('../services/ngoService');
 const auditLogService = require('../services/auditLogService');
@@ -24,8 +26,46 @@ async function listProofs(req, res, next) {
     const { status } = req.query;
     const q = {};
     if (status) q.status = status;
-    const proofs = await Proof.find(q).populate('milestone uploader').sort({ createdAt: -1 }).limit(200);
-    return success(res, { data: proofs, legacyKey: 'data' });
+    const proofs = await Proof.find(q)
+      .populate({ path: 'milestone', populate: { path: 'campaign', select: 'title ngoWalletAddress' } })
+      .populate('uploader')
+      .sort({ createdAt: -1 })
+      .limit(200);
+
+    const milestoneIds = proofs
+      .map((p) => p?.milestone?._id)
+      .filter(Boolean);
+
+    const releaseTxs = milestoneIds.length
+      ? await Transaction.find({ milestone: { $in: milestoneIds }, type: 'release' })
+        .select('milestone txHash amount network fromAddress toAddress createdAt')
+        .lean()
+      : [];
+
+    const txByMilestone = new Map(releaseTxs.map((tx) => [String(tx.milestone), tx]));
+
+    const enriched = proofs.map((proofDoc) => {
+      const proof = proofDoc.toObject();
+      const milestone = proof?.milestone || {};
+      const campaign = milestone?.campaign || {};
+      const tx = txByMilestone.get(String(milestone?._id));
+      // Always use campaign-linked wallet as the source of truth for admin release checks.
+      const ngoWalletAddress = campaign?.ngoWalletAddress || '';
+
+      return {
+        ...proof,
+        campaignName: campaign?.title || '',
+        ngoName: proof?.uploader?.profile?.organizationName || proof?.uploader?.email || 'NGO',
+        ngoWalletAddress,
+        amountETH: Number(milestone?.amountETH ?? milestone?.amount ?? 0),
+        txHash: milestone?.txHash || milestone?.fundRequest?.txHash || tx?.txHash || '',
+        releaseTxFromAddress: tx?.fromAddress || '',
+        releaseTxToAddress: tx?.toAddress || ngoWalletAddress,
+        releaseNetwork: tx?.network,
+      };
+    });
+
+    return success(res, { data: enriched, legacyKey: 'data' });
   } catch (err) {
     next(err);
   }
@@ -96,20 +136,20 @@ async function verifyNgo(req, res, next) {
 
 async function rejectNgo(req, res, next) {
   try {
-    const ngo = await ngoService.setNgoVerification(req.params.id, 'rejected');
-    if (!ngo) return fail(res, { status: 404, error: 'NGO not found', code: 'NGO_NOT_FOUND' });
+    const result = await ngoService.removeNgoAndData(req.params.id);
+    if (!result) return fail(res, { status: 404, error: 'NGO not found', code: 'NGO_NOT_FOUND' });
 
     await req.audit({
       action: 'VERIFY_NGO_REJECTED',
       entityType: 'User',
-      entityId: ngo._id,
-      metadata: { verificationStatus: ngo.verificationStatus },
+      entityId: result.ngoId,
+      metadata: { action: 'deleted', removedCampaigns: result.removedCampaigns, removedMilestones: result.removedMilestones },
     });
 
     return success(res, {
-      data: ngo,
+      data: { ngoId: result.ngoId },
       legacyKey: 'ngo',
-      message: 'NGO rejected',
+      message: 'NGO rejected and removed',
     });
   } catch (err) {
     next(err);
@@ -186,6 +226,7 @@ async function releaseMilestoneFunds(req, res, next) {
       decision: req.body.decision,
       txHash: req.body.txHash,
       remarks: req.body.remarks,
+      expectedNgoWalletAddress: req.body.expectedNgoWalletAddress,
     });
 
     await req.audit({
@@ -199,9 +240,19 @@ async function releaseMilestoneFunds(req, res, next) {
       },
     });
 
+    const blockchain = updated?.$locals?.blockchainRelease || null;
+    const transaction = updated?.$locals?.releaseTransaction || null;
+    const warning = updated?.$locals?.releaseWarning || null;
+
     return success(res, {
       data: updated,
       legacyKey: 'milestone',
+      extra: {
+        txHash: updated?.fundRequest?.txHash,
+        blockchain,
+        transaction,
+        warning,
+      },
       message: req.body.decision === 'approve' ? 'Funds released' : 'Fund request rejected',
     });
   } catch (err) {
@@ -211,9 +262,13 @@ async function releaseMilestoneFunds(req, res, next) {
 
 async function releaseMilestoneFundsManual(req, res, next) {
   try {
-    const { milestone, blockchain } = await fundRequestService.releaseApprovedMilestoneFunds({
+    const remarks = req.body?.remarks;
+
+    const { milestone, blockchain, transaction, warning } = await fundRequestService.releaseApprovedMilestoneFunds({
       milestoneId: req.params.id,
       adminId: req.user.sub,
+      remarks,
+      expectedNgoWalletAddress: req.body?.expectedNgoWalletAddress,
     });
 
     await req.audit({
@@ -231,7 +286,13 @@ async function releaseMilestoneFundsManual(req, res, next) {
     return success(res, {
       data: milestone,
       legacyKey: 'milestone',
-      extra: { txHash: blockchain.txHash, campaignChainId: blockchain.campaignChainId },
+      extra: {
+        txHash: blockchain.txHash,
+        campaignChainId: blockchain.campaignChainId,
+        blockchain,
+        transaction,
+        warning,
+      },
       message: 'Funds released successfully',
     });
   } catch (err) {
@@ -401,7 +462,7 @@ async function getCampaignFundsDetails(req, res, next) {
   try {
     const campaigns = await Campaign.find({ status: 'published' })
       .populate('ngo', 'email profile walletAddress')
-      .select('title slug ngoWalletAddress fundingGoal status');
+      .select('title slug ngoWalletAddress fundingGoal status contractCampaignId');
 
     if (!campaigns.length) {
       return success(res, {
@@ -411,46 +472,89 @@ async function getCampaignFundsDetails(req, res, next) {
       });
     }
 
+    const campaignIds = campaigns.map((c) => c._id);
+
+    const donationSums = await Donation.aggregate([
+      {
+        $match: {
+          campaign: { $in: campaignIds },
+          status: 'confirmed',
+          currency: 'ETH',
+        },
+      },
+      {
+        $group: {
+          _id: '$campaign',
+          totalDonatedEth: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    const donatedByCampaignId = new Map(
+      donationSums.map((item) => [String(item._id), Number(item.totalDonatedEth || 0)])
+    );
+
     // Fetch blockchain data for each campaign
     const campaignFunds = await Promise.all(
       campaigns.map(async (campaign) => {
+        const donatedEth = donatedByCampaignId.get(String(campaign._id)) || 0;
         try {
-          const blockchainData = await blockchainService.getCampaignFunds(campaign._id);
-          
+          if (!campaign.contractCampaignId) {
+            throw new Error('contractCampaignId is missing for campaign');
+          }
+
+          const campaignChainId = campaign.contractCampaignId;
+          console.log('[adminController] Fetching campaign funds', {
+            campaignDbId: String(campaign._id),
+            contractCampaignId: campaignChainId,
+          });
+
+          const blockchainData = await blockchainService.getCampaignFunds(campaignChainId);
+
           // Fetch all milestones for this campaign
           const milestones = await Milestone.find({ campaign: campaign._id });
-          const lockedFunds = milestones
-            .filter((m) => !m.isPaid && m.fundRequest?.status !== 'rejected')
-            .reduce((sum, m) => sum + Number(m.amount || 0), 0);
-          
-          const releasedFunds = milestones
+
+          const releasedFundsEth = milestones
             .filter((m) => m.isPaid)
             .reduce((sum, m) => sum + Number(m.fundRequest?.releasedAmount || 0), 0);
 
+          const contractLockedEth = Number(blockchainData.fundsEth || 0);
+          const lockedFundsEth = contractLockedEth > 0 ? contractLockedEth : Math.max(0, donatedEth - releasedFundsEth);
+
           return {
             campaignId: campaign._id,
+            contractCampaignId: campaign.contractCampaignId || null,
             title: campaign.title,
             slug: campaign.slug,
             ngoWalletAddress: campaign.ngoWalletAddress,
             ngo: campaign.ngo,
             contractBalanceEth: blockchainData.fundsEth,
             contractBalanceWei: blockchainData.fundsWei,
-            lockedFunds,
-            releasedFunds,
+            donatedFundsEth: donatedEth,
+            lockedFundsEth,
+            releasedFundsEth,
             fundingGoal: campaign.fundingGoal,
           };
         } catch (error) {
+          const milestones = await Milestone.find({ campaign: campaign._id });
+          const releasedFundsEth = milestones
+            .filter((m) => m.isPaid)
+            .reduce((sum, m) => sum + Number(m.fundRequest?.releasedAmount || 0), 0);
+          const lockedFundsEth = Math.max(0, donatedEth - releasedFundsEth);
+
           // Return campaign without blockchain data if fetch fails
           return {
             campaignId: campaign._id,
+            contractCampaignId: campaign.contractCampaignId || null,
             title: campaign.title,
             slug: campaign.slug,
             ngoWalletAddress: campaign.ngoWalletAddress,
             ngo: campaign.ngo,
             contractBalanceEth: 'N/A',
             contractBalanceWei: 'N/A',
-            lockedFunds: 0,
-            releasedFunds: 0,
+            donatedFundsEth: donatedEth,
+            lockedFundsEth,
+            releasedFundsEth,
             fundingGoal: campaign.fundingGoal,
             error: error?.message,
           };

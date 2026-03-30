@@ -1,5 +1,6 @@
 const milestoneService = require('../services/milestoneService');
 const { success, fail } = require('../lib/apiResponse');
+const logger = require('../lib/logger');
 
 async function addMilestone(req, res, next) {
   try {
@@ -16,6 +17,14 @@ async function addMilestone(req, res, next) {
 
     return success(res, { status: 201, data: created, legacyKey: 'milestone', message: 'Milestone created' });
   } catch (err) {
+    logger.error('Milestone creation failed', {
+      campaignId: req.params?.campaignId,
+      milestoneTitle: String(req.body?.title || '').trim(),
+      milestoneOrder: Number(req.body?.order || 0) || null,
+      error: err?.message,
+      code: err?.code,
+      details: err?.details,
+    });
     next(err);
   }
 }

@@ -1,6 +1,8 @@
 const campaignService = require('../services/campaignService');
+const blockchainService = require('../services/blockchainService');
 const { success, fail } = require('../lib/apiResponse');
 const User = require('../models/User');
+const { inrToEth } = require('../lib/currency');
 
 async function createCampaign(req, res, next) {
   try {
@@ -24,8 +26,13 @@ async function createCampaign(req, res, next) {
       });
     }
 
+    const fundingGoalINR = Number(req.body.fundingGoalINR ?? req.body.fundingGoal);
+
     const data = {
       ...req.body,
+      fundingGoal: fundingGoalINR,
+      fundingGoalINR,
+      fundingGoalETH: inrToEth(fundingGoalINR),
       ngo: req.user?.sub,
       ngoWalletAddress: ngo.walletAddress,
     };
@@ -71,10 +78,18 @@ async function getCampaign(req, res, next) {
     const id = req.params.id;
     const { campaign, milestones } = await campaignService.getCampaignWithMilestones(id);
     if (!campaign) return fail(res, { status: 404, error: 'Campaign not found', code: 'CAMPAIGN_NOT_FOUND' });
+
+    let contractAddress = null;
+    try {
+      contractAddress = blockchainService.getConfiguredContractAddress();
+    } catch (_err) {
+      contractAddress = null;
+    }
+
     return success(res, {
       data: campaign,
       legacyKey: 'campaign',
-      extra: { milestones },
+      extra: { milestones, contractAddress },
     });
   } catch (err) {
     next(err);

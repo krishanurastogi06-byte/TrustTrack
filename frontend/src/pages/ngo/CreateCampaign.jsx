@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Card from "../../components/ui/Card";
 import { PlusCircle } from "lucide-react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
@@ -17,6 +17,7 @@ function CreateCampaign() {
     const {
         register,
         control,
+        watch,
         handleSubmit,
         formState: { errors, isValid },
         reset,
@@ -29,13 +30,32 @@ function CreateCampaign() {
             coverImageUrl: "",
             description: "",
             fundingGoal: undefined,
-            milestones: [{ title: "", amount: undefined }],
+            milestones: [{ title: "", amount: undefined, order: 1 }],
         },
     });
 
     const createCampaignMutation = useCreateCampaign();
     const createMilestoneMutation = useCreateMilestone();
     const submitting = createCampaignMutation.isPending || createMilestoneMutation.isPending;
+    const INR_PER_ETH = 250000;
+
+    const fundingGoalInr = watch("fundingGoal");
+    const milestones = watch("milestones");
+
+    const formatEth = useMemo(() => {
+        return (amountInr) => {
+            const amount = Number(amountInr);
+            if (!Number.isFinite(amount) || amount <= 0) return "-";
+            return `${(amount / INR_PER_ETH).toFixed(6)} ETH`;
+        };
+    }, [INR_PER_ETH]);
+
+    const toEthAmount = (amountInr) => {
+        const amount = Number(amountInr);
+        if (!Number.isFinite(amount) || amount <= 0) return "0";
+        const eth = amount / INR_PER_ETH;
+        return eth.toFixed(18).replace(/\.0+$/, "").replace(/(\.\d*?[1-9])0+$/, "$1");
+    };
 
     const slugify = (value) =>
         String(value || "")
@@ -60,6 +80,8 @@ function CreateCampaign() {
                 category: values.category,
                 coverImage: values.coverImageUrl || undefined,
                 fundingGoal: Number(values.fundingGoal),
+                fundingGoalINR: Number(values.fundingGoal),
+                fundingGoalETH: Number(values.fundingGoal) / INR_PER_ETH,
             };
 
             const campaignResponse = await createCampaignMutation.mutateAsync(payload);
@@ -70,20 +92,27 @@ function CreateCampaign() {
             }
 
             if (campaignId && values.milestones?.length) {
-                const milestoneResults = await Promise.allSettled(
-                    values.milestones.map((m) =>
-                        createMilestoneMutation.mutateAsync({
+                let failedCount = 0;
+                for (const [idx, m] of values.milestones.entries()) {
+                    try {
+                        await createMilestoneMutation.mutateAsync({
                             campaignId,
                             payload: {
-                                title: m.title,
-                                amount: Number(m.amount),
-                                description: m.title,
+                                title: String(m.title || "").trim(),
+                                amountETH: toEthAmount(m.amount),
+                                order: Number(m.order || 0) > 0 ? Number(m.order) : (idx + 1),
                             },
-                        })
-                    )
-                );
+                        });
+                    } catch (error) {
+                        failedCount += 1;
+                        console.error(`[CreateCampaign] Milestone ${idx + 1} failed`, {
+                            title: values?.milestones?.[idx]?.title,
+                            order: Number(values?.milestones?.[idx]?.order || 0) || idx + 1,
+                            reason: error?.message || error,
+                        });
+                    }
+                }
 
-                const failedCount = milestoneResults.filter((r) => r.status === "rejected").length;
                 if (failedCount > 0) {
                     setSubmitSuccess(`Campaign created, but ${failedCount} milestone(s) failed. You can add them later.`);
                     return;
@@ -167,15 +196,26 @@ function CreateCampaign() {
                     </div>
 
                     <div>
-                        <FormInput
-                            label="Funding Goal (₹)"
-                            id="fundingGoal"
-                            register={register}
-                            registerOptions={{ valueAsNumber: true }}
-                            type="number"
-                            error={errors.fundingGoal}
-                            placeholder="50000"
-                        />
+                        <label htmlFor="fundingGoal" className="text-sm font-bold text-slate-700">Funding Goal (₹)</label>
+                        <div className="mt-2 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_200px] gap-3 items-center">
+                            <div>
+                                <input
+                                    id="fundingGoal"
+                                    type="number"
+                                    placeholder="50000"
+                                    {...register("fundingGoal", { valueAsNumber: true })}
+                                    className={`w-full border ${errors?.fundingGoal ? "border-red-400" : "border-slate-200"} bg-white px-4 py-3.5 rounded-xl focus:outline-none transition-all text-slate-700`}
+                                />
+                                {errors?.fundingGoal && (
+                                    <p className="text-xs text-red-600 mt-1">{errors.fundingGoal.message}</p>
+                                )}
+                            </div>
+                            <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-right">
+                                <p className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">Approx ETH</p>
+                                <p className="text-sm font-bold text-indigo-700">{formatEth(fundingGoalInr)}</p>
+                            </div>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">Conversion uses 1 ETH = ₹{INR_PER_ETH.toLocaleString()}</p>
                     </div>
 
                     <div className="space-y-3 pt-2">
@@ -183,7 +223,7 @@ function CreateCampaign() {
                             <h3 className="text-sm font-bold text-slate-700">Project Milestones</h3>
                             <button
                                 type="button"
-                                onClick={() => append({ title: "", amount: undefined })}
+                                onClick={() => append({ title: "", amount: undefined, order: fields.length + 1 })}
                                 className="text-indigo-600 hover:text-indigo-700 text-sm font-bold transition-colors"
                             >
                                 + Add Milestone
@@ -192,8 +232,8 @@ function CreateCampaign() {
 
                         <div className="space-y-3">
                             {fields.map((f, idx) => (
-                                <div key={f.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
-                                    <div className="md:col-span-2">
+                                <div key={f.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+                                    <div className="md:col-span-8">
                                         <input
                                             {...register(`milestones.${idx}.title`)}
                                             placeholder="e.g. Phase 1 - Supply Assessment"
@@ -203,17 +243,27 @@ function CreateCampaign() {
                                             <p className="text-xs text-red-600 mt-1">{errors.milestones[idx].title.message}</p>
                                         )}
                                     </div>
-                                    <div className="flex gap-3 items-center">
-                                        <input
-                                            {...register(`milestones.${idx}.amount`, { valueAsNumber: true })}
-                                            placeholder="Amount (₹)"
-                                            type="number"
-                                            className={`w-full border ${errors?.milestones?.[idx]?.amount ? "border-red-400" : "border-slate-200"} bg-white px-4 py-3.5 rounded-xl focus:outline-none transition-all text-slate-700`}
-                                        />
-                                        <button type="button" onClick={() => remove(idx)} className="text-red-600 hover:text-red-700 px-3 py-2">Remove</button>
-                                        {errors?.milestones?.[idx]?.amount && (
-                                            <p className="text-xs text-red-600 mt-1">{errors.milestones[idx].amount.message}</p>
-                                        )}
+                                    <div className="md:col-span-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_120px_auto] gap-3 items-center">
+                                            <div>
+                                                <input
+                                                    {...register(`milestones.${idx}.amount`, { valueAsNumber: true })}
+                                                    placeholder="Amount (₹)"
+                                                    type="number"
+                                                    className={`w-full border ${errors?.milestones?.[idx]?.amount ? "border-red-400" : "border-slate-200"} bg-white px-4 py-3.5 rounded-xl focus:outline-none transition-all text-slate-700`}
+                                                />
+                                                {errors?.milestones?.[idx]?.amount && (
+                                                    <p className="text-xs text-red-600 mt-1">{errors.milestones[idx].amount.message}</p>
+                                                )}
+                                            </div>
+
+                                            <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-right">
+                                                <p className="text-[10px] uppercase tracking-wide text-indigo-500 font-semibold">Approx ETH</p>
+                                                <p className="text-xs font-bold text-indigo-700">{formatEth(milestones?.[idx]?.amount)}</p>
+                                            </div>
+
+                                            <button type="button" onClick={() => remove(idx)} className="text-red-600 hover:text-red-700 px-3 py-2">Remove</button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}

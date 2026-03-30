@@ -4,10 +4,13 @@ const { success, fail } = require('../lib/apiResponse');
 async function createDonation(req, res, next) {
   try {
     const donorId = req.user.role === 'donor' ? req.user.sub : req.body.donorId || req.user.sub;
+    const amountETH = Number(req.body.amountETH ?? req.body.amount);
     const created = await donationService.createDonation({
       campaign: req.body.campaignId,
+      contractCampaignId: req.body.contractCampaignId,
       donor: donorId,
-      amount: req.body.amount,
+      amount: amountETH,
+      amountETH,
       currency: req.body.currency || 'ETH',
       txHash: req.body.txHash,
       status: req.body.status || 'pending',
@@ -24,6 +27,38 @@ async function createDonation(req, res, next) {
     });
 
     return success(res, { status: 201, data: created, legacyKey: 'donation', message: 'Donation created' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function confirmDonation(req, res, next) {
+  try {
+    const donorId = req.user.role === 'donor' ? req.user.sub : req.body.donorId || req.user.sub;
+    const amountETH = Number(req.body.amountETH ?? req.body.amount);
+
+    const created = await donationService.createDonation({
+      campaign: req.body.campaignId,
+      contractCampaignId: req.body.contractCampaignId,
+      donor: donorId,
+      amount: amountETH,
+      amountETH,
+      currency: req.body.currency || 'ETH',
+      txHash: req.body.txHash,
+      status: 'confirmed',
+      message: req.body.message,
+      metadata: req.body.metadata,
+      confirmedAt: new Date(),
+    });
+
+    await req.audit({
+      action: 'CONFIRM_DONATION',
+      entityType: 'Donation',
+      entityId: created._id,
+      metadata: { campaignId: req.body.campaignId, txHash: req.body.txHash },
+    });
+
+    return success(res, { status: 201, data: created, legacyKey: 'donation', message: 'Donation confirmed' });
   } catch (err) {
     next(err);
   }
@@ -64,4 +99,4 @@ async function getDonation(req, res, next) {
   }
 }
 
-module.exports = { createDonation, listDonations, getDonation };
+module.exports = { createDonation, confirmDonation, listDonations, getDonation };

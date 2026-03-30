@@ -45,9 +45,15 @@ export async function me() {
   return normalizeMePayload(res.data);
 }
 
+export async function updateWallet(walletAddress) {
+  const res = await api.put("/auth/me/wallet", { walletAddress });
+  return normalizeMePayload(res.data);
+}
+
 export default {
   login,
   register,
   refresh,
   me,
+  updateWallet,
 };

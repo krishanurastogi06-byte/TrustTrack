@@ -44,10 +44,14 @@ const releaseFundsSchema = z
     decision: z.enum(['approve', 'reject']),
     txHash: z.string().min(10).max(200).optional(),
     remarks: z.string().max(1000).optional(),
-  })
-  .refine((body) => (body.decision === 'approve' ? Boolean(body.txHash) : true), {
-    message: 'txHash is required when approving fund release',
+    expectedNgoWalletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid NGO wallet address').optional(),
   });
+
+const manualReleaseSchema = z.object({
+  txHash: z.string().min(10).max(200).optional(),
+  remarks: z.string().max(1000).optional(),
+  expectedNgoWalletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid NGO wallet address').optional(),
+});
 
 module.exports = {
   ngoIdParamSchema,
@@ -58,4 +62,5 @@ module.exports = {
   milestoneIdParamSchema,
   campaignIdParamSchema,
   releaseFundsSchema,
+  manualReleaseSchema,
 };

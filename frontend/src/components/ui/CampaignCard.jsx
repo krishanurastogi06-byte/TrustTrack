@@ -5,10 +5,10 @@ import { useNavigate } from "react-router-dom";
 
 function CampaignCard({ data }) {
     const navigate = useNavigate();
-    const { id, title, description, category, raised, goal, image } = data;
+    const { id, title, description, category, raisedEth = 0, goalEth = 0, image } = data;
 
     // Calculate progress percentage securely
-    const progress = goal > 0 ? Math.min((raised / goal) * 100, 100) : 0;
+    const progress = goalEth > 0 ? Math.min((raisedEth / goalEth) * 100, 100) : 0;
 
     return (
         <Card className="p-0 overflow-hidden flex flex-col hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.1)] transition-shadow">
@@ -29,8 +29,8 @@ function CampaignCard({ data }) {
                 
                 <div className="mt-auto">
                     <div className="flex justify-between text-sm font-semibold mb-2">
-                        <span className="text-indigo-600">₹{raised.toLocaleString()} raised</span>
-                        <span className="text-slate-400">of ₹{goal.toLocaleString()}</span>
+                        <span className="text-indigo-600">{Number(raisedEth || 0).toFixed(4)} ETH raised</span>
+                        <span className="text-slate-400">of {Number(goalEth || 0).toFixed(4)} ETH</span>
                     </div>
                     {/* Progress bar */}
                     <div className="w-full bg-slate-100 rounded-full h-2 mb-6">

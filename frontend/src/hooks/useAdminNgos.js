@@ -55,22 +55,22 @@ export function useRejectNgo(options = {}) {
     mutationFn: (ngoId) => adminNgoService.rejectAdminNgo(ngoId),
     onMutate: async (ngoId) => {
       await qc.cancelQueries({ queryKey: ["admin-ngos"] });
-      patchNgoInCache(qc, ngoId, { isVerified: false, verificationStatus: "rejected" });
+      // Remove the NGO from the list immediately
+      const matches = qc.getQueriesData({ queryKey: ["admin-ngos"] });
+      matches.forEach(([key, oldData]) => {
+        if (!oldData?.items) return;
+        const items = oldData.items.filter((ngo) => String(ngo?._id) !== String(ngoId));
+        qc.setQueryData(key, { ...oldData, items, total: Math.max(0, (oldData.total || 1) - 1) });
+      });
       return { ngoId };
     },
     onError: (_err, _ngoId, ctx) => {
-      if (ctx?.ngoId) {
-        patchNgoInCache(qc, ctx.ngoId, { isVerified: false, verificationStatus: "pending" });
-      }
+      // Refetch on error to restore the list
+      qc.invalidateQueries({ queryKey: ["admin-ngos"] });
       if (options.onError) options.onError(_err);
     },
     onSuccess: (data, ngoId) => {
-      const updatedNgo = data?.ngo;
-      if (updatedNgo?._id) {
-        patchNgoInCache(qc, updatedNgo._id, updatedNgo);
-      } else {
-        patchNgoInCache(qc, ngoId, { isVerified: false, verificationStatus: "rejected" });
-      }
+      // Already removed from cache in onMutate
       if (options.onSuccess) options.onSuccess(data);
     },
   });

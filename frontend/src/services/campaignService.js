@@ -25,10 +25,12 @@ function normalizeSinglePayload(payload = {}, key) {
     : Array.isArray(base?.milestones)
       ? base.milestones
       : [];
+  const contractAddress = payload.contractAddress || base?.contractAddress || null;
 
   return {
     [key]: base,
     milestones,
+    contractAddress,
     success: payload.success,
     message: payload.message || "",
   };
@@ -97,7 +99,25 @@ export async function fetchCampaignMilestones(campaignId) {
 
 export async function createMilestone(campaignId, payload) {
   if (!campaignId) throw new Error("campaignId is required");
-  const res = await api.post(`/campaigns/${campaignId}/milestones`, payload);
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Invalid milestone payload");
+  }
+
+  const title = String(payload.title || "").trim();
+  const amount = Number(payload.amountETH);
+  const order = Number(payload.order || 0);
+
+  if (!title) throw new Error("Milestone title is required");
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("Milestone amountETH must be greater than 0");
+  if (!Number.isInteger(order) || order <= 0) throw new Error("Milestone order must be a positive integer");
+
+  const requestPayload = {
+    title,
+    amountETH: amount,
+    order,
+  };
+
+  const res = await api.post(`/campaigns/${campaignId}/milestones`, requestPayload);
   return normalizeSinglePayload(res.data || {}, "milestone");
 }
 

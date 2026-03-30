@@ -31,6 +31,7 @@ const {
 	milestoneIdParamSchema,
 	campaignIdParamSchema,
 	releaseFundsSchema,
+	manualReleaseSchema,
 } = require('../validation/admin');
 
 const router = express.Router();
@@ -61,6 +62,7 @@ router.patch('/campaigns/:id/reject', validate(campaignIdParamSchema, 'params'),
 router.post(
 	'/milestones/:id/release',
 	validate(milestoneIdParamSchema, 'params'),
+	validate(manualReleaseSchema),
 	releaseMilestoneFundsManual
 );
 

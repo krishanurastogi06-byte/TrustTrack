@@ -1,13 +1,17 @@
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
-import { Wallet as WalletIcon, Copy, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Wallet as WalletIcon, Copy, ArrowDownLeft, ArrowUpRight, CheckCircle2 } from "lucide-react";
 import useWallet from "../../hooks/useWallet";
 import { formatEther } from "ethers";
 import { useEffect, useState } from "react";
+import authService from "../../services/authService";
 
 function Wallet() {
-    const { account, connect, provider, isConnected, chainId, isMetaMaskAvailable } = useWallet();
+    const { account, connect, disconnect, provider, isConnected, chainId, isMetaMaskAvailable, error, isInitialized } = useWallet({ role: "donor" });
     const [balance, setBalance] = useState("0");
+    const [isConnecting, setIsConnecting] = useState(false);
+    const [saveError, setSaveError] = useState("");
+    const [saveSuccess, setSaveSuccess] = useState("");
 
     useEffect(() => {
         async function loadBalance() {
@@ -19,6 +23,35 @@ function Wallet() {
     }, [provider, account]);
 
     const short = account ? `${account.slice(0, 6)}...${account.slice(-4)}` : "-";
+
+    async function handleConnect() {
+        setSaveError("");
+        setSaveSuccess("");
+        setIsConnecting(true);
+        try {
+            const connected = await connect();
+            if (connected?.account) {
+                await authService.updateWallet(connected.account);
+                setSaveSuccess("Wallet connected and saved successfully.");
+            }
+        } catch (err) {
+            setSaveError(err?.message || "Failed to connect wallet");
+        } finally {
+            setIsConnecting(false);
+        }
+    }
+
+    async function handleDisconnect() {
+        setSaveError("");
+        setSaveSuccess("");
+        try {
+            disconnect();
+            setBalance("0");
+            setSaveSuccess("Wallet disconnected successfully.");
+        } catch (err) {
+            setSaveError(err?.message || "Failed to disconnect wallet");
+        }
+    }
 
     return (
         <div className="max-w-7xl mx-auto w-full">
@@ -40,40 +73,57 @@ function Wallet() {
                         <div className="flex justify-between items-center mb-8">
                             <div>
                                 <p className="text-indigo-200 text-sm font-semibold uppercase tracking-widest mb-1">Available Balance</p>
-                                <h2 className="text-5xl font-extrabold tracking-tight">{balance} <span className="text-2xl text-indigo-300">ETH</span></h2>
-                                <p className="text-indigo-200 font-medium mt-2">Network: {chainId || "-"}</p>
+                                {isConnected ? (
+                                    <>
+                                        <h2 className="text-5xl font-extrabold tracking-tight">{balance} <span className="text-2xl text-indigo-300">ETH</span></h2>
+                                        <p className="text-indigo-200 font-medium mt-2">Network: {chainId || "-"}</p>
+                                    </>
+                                ) : (
+                                    <p className="text-xl text-indigo-300 font-semibold">Not Connected</p>
+                                )}
                             </div>
                         </div>
 
-                        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 mb-6 border border-white/10 flex items-center justify-between">
-                            <div>
-                                <p className="text-xs text-indigo-200 font-semibold uppercase tracking-wider mb-1">Connected Address</p>
-                                <p className="font-mono text-sm">{short}</p>
+                        {isConnected && (
+                            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 mb-6 border border-white/10 flex items-center justify-between">
+                                <div>
+                                    <p className="text-xs text-indigo-200 font-semibold uppercase tracking-wider mb-1">Connected Address</p>
+                                    <p className="font-mono text-sm">{short}</p>
+                                </div>
+                                <button
+                                    onClick={() => account && navigator.clipboard.writeText(account)}
+                                    className="p-2 hover:bg-white/20 rounded-xl transition-colors text-indigo-200 hover:text-white"
+                                >
+                                    <Copy size={18} />
+                                </button>
                             </div>
-                            <button
-                                onClick={() => account && navigator.clipboard.writeText(account)}
-                                className="p-2 hover:bg-white/20 rounded-xl transition-colors text-indigo-200 hover:text-white"
-                            >
-                                <Copy size={18} />
-                            </button>
-                        </div>
+                        )}
 
                         <div className="grid grid-cols-2 gap-4">
                             <Button 
-                                label={isConnected ? "Connected" : "Connect"}
-                                onClick={connect}
-                                disabled={isConnected}
-                                className={`w-full font-bold shadow-none !py-3 border border-indigo-600 ${
+                                label={isConnecting ? "Connecting..." : (isConnected ? "Disconnect Wallet" : "Connect Wallet")}
+                                onClick={isConnected ? handleDisconnect : handleConnect}
+                                disabled={isConnecting || !isInitialized}
+                                className={`w-full font-bold shadow-none !py-3 border ${
                                   isConnected
-                                    ? "bg-indigo-500 text-indigo-200 cursor-no-drop opacity-60"
-                                    : "bg-indigo-700 text-indigo-900 hover:bg-indigo-50 hover:text-indigo-900 cursor-pointer"
+                                    ? "bg-red-600 text-white hover:bg-red-700 border-red-600 cursor-pointer"
+                                    : "bg-indigo-700 text-indigo-900 hover:bg-indigo-50 hover:text-indigo-900 cursor-pointer border-indigo-600"
                                 }`}
                             >
-                                <ArrowDownLeft size={18} className="mr-1" /> {isConnected ? "Connected" : "Connect Wallet"}
+                                {isConnected ? (
+                                    <>
+                                        <ArrowUpRight size={18} className="mr-1" /> Disconnect
+                                    </>
+                                ) : (
+                                    <>
+                                        <ArrowDownLeft size={18} className="mr-1" /> Connect Wallet
+                                    </>
+                                )}
                             </Button>
                             <Button 
                                 label="Receive" 
                                 className="bg-indigo-700 text-indigo-900 hover:bg-indigo-50 hover:text-indigo-900 w-full font-bold shadow-none !py-3 cursor-pointer border border-indigo-600"
+                                disabled={!isConnected}
                             >
                                 <ArrowUpRight size={18} className="mr-1" /> Share Address
                             </Button>
@@ -81,6 +131,18 @@ function Wallet() {
 
                         {!isMetaMaskAvailable && (
                             <p className="mt-4 text-xs text-amber-200">MetaMask not detected. Install it to connect your wallet.</p>
+                        )}
+                        {error && <p className="mt-2 text-xs text-red-200">{String(error.message || error)}</p>}
+                        {saveError && (
+                            <p className="mt-2 text-xs text-red-200">{saveError}</p>
+                        )}
+                        {saveSuccess && (
+                            <p className="mt-2 text-xs text-emerald-200 flex items-center gap-1">
+                                <CheckCircle2 size={14} /> {saveSuccess}
+                            </p>
+                        )}
+                        {!isConnected && !error && !saveError && isInitialized && (
+                            <p className="mt-4 text-xs text-slate-400 text-center">Click "Connect Wallet" to get started</p>
                         )}
                     </div>
                 </Card>

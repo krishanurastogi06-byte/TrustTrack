@@ -10,9 +10,7 @@ const UserSchema = new mongoose.Schema({
     type: String,
     lowercase: true,
     trim: true,
-    required: function walletRequiredForNgo() {
-      return this.role === 'ngo';
-    },
+    sparse: true,
   },
   isVerified: {
     type: Boolean,

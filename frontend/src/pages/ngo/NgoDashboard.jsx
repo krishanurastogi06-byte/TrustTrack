@@ -1,43 +1,27 @@
 import Card from "../../components/ui/Card";
-import Grid from "../../components/ui/Grid";
-import { LayoutDashboard, Wallet, Megaphone, Inbox, Edit2, AlertCircle, CheckCircle2, DollarSign, Lock } from "lucide-react";
+import { LayoutDashboard, Wallet, Megaphone, Inbox, DollarSign, FileCheck } from "lucide-react";
 import { useCampaigns } from "../../hooks/useCampaigns";
 import { useAuthStore } from "../../store/useAuthStore";
-import { useCampaignMilestones } from "../../hooks/useCampaigns";
 import { useState, useEffect } from "react";
-import WalletAddressModal from "../../components/ui/WalletAddressModal";
 import ngoService from "../../services/ngoService";
+import { useNavigate } from "react-router-dom";
 
 function NgoDashboard() {
     const user = useAuthStore((state) => state.user);
+    const navigate = useNavigate();
     const { data: campaignsData, isLoading } = useCampaigns({ ngoId: user?._id, perPage: 200 }, { enabled: !!user?._id });
     const campaigns = campaignsData?.items || [];
     const active = campaigns.filter((c) => c.status === "published").length;
-    const totalGoal = campaigns.reduce((sum, c) => sum + Number(c.fundingGoal || 0), 0);
-    
-    const [walletData, setWalletData] = useState(null);
-    const [walletLoading, setWalletLoading] = useState(true);
-    const [showWalletModal, setShowWalletModal] = useState(false);
+    const totalGoalEth = campaigns.reduce((sum, c) => sum + Number(c.fundingGoalETH || 0), 0);
+
     const [fundsSummary, setFundsSummary] = useState(null);
     const [fundsSummaryLoading, setFundsSummaryLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchWallet = async () => {
-            try {
-                setWalletLoading(true);
-                const profile = await ngoService.getProfile();
-                setWalletData(profile);
-            } catch (error) {
-                console.error('Failed to fetch NGO profile:', error);
-            } finally {
-                setWalletLoading(false);
-            }
-        };
-
-        if (user?._id) {
-            fetchWallet();
-        }
-    }, [user?._id]);
+    const formatEth = (value) => {
+        const amount = Number(value || 0);
+        if (!Number.isFinite(amount)) return "0.0000 ETH";
+        return `${amount.toFixed(4)} ETH`;
+    };
 
     useEffect(() => {
         const fetchFundsSummary = async () => {
@@ -54,14 +38,10 @@ function NgoDashboard() {
 
         if (user?._id) {
             fetchFundsSummary();
+            const intervalId = setInterval(fetchFundsSummary, 15000);
+            return () => clearInterval(intervalId);
         }
     }, [user?._id]);
-
-    const handleWalletUpdate = (updatedProfile) => {
-        setWalletData(updatedProfile);
-    };
-
-    const hasWallet = !!walletData?.walletAddress;
 
     return (
         <div className="max-w-7xl mx-auto w-full">
@@ -73,51 +53,7 @@ function NgoDashboard() {
                 <p className="text-slate-500 mt-2 font-medium">Manage your active campaigns and monitor funding.</p>
             </div>
 
-            {/* Wallet Status Alert */}
-            {!walletLoading && (
-                <div className="mb-6">
-                    <Card className={`border-l-4 ${hasWallet ? 'border-l-green-500 bg-green-50' : 'border-l-amber-500 bg-amber-50'}`}>
-                        <div className="flex items-start justify-between">
-                            <div className="flex items-start gap-3">
-                                {hasWallet ? (
-                                    <>
-                                        <CheckCircle2 className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
-                                        <div>
-                                            <h3 className="font-semibold text-green-900">Wallet Configured</h3>
-                                            <p className="text-sm text-green-800 mt-1">
-                                                Funds will be transferred to: <span className="font-mono font-semibold">{walletData.walletAddress}</span>
-                                            </p>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
-                                        <div>
-                                            <h3 className="font-semibold text-amber-900">Wallet Not Configured</h3>
-                                            <p className="text-sm text-amber-800 mt-1">
-                                                You must add a wallet address before creating campaigns or receiving funds.
-                                            </p>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                            <button
-                                onClick={() => setShowWalletModal(true)}
-                                className={`px-4 py-2 rounded-lg font-medium transition flex items-center gap-2 whitespace-nowrap ${
-                                    hasWallet
-                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                        : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                                }`}
-                            >
-                                <Edit2 size={16} />
-                                {hasWallet ? 'Update' : 'Add'} Wallet
-                            </button>
-                        </div>
-                    </Card>
-                </div>
-            )}
-
-            <Grid>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {/* Received Funds Card */}
                 <Card className="relative overflow-hidden group hover:shadow-[0_8px_30px_-4px_rgba(16,185,129,0.15)] transition-all duration-300">
                     <div className="flex justify-between items-start mb-4">
@@ -127,28 +63,11 @@ function NgoDashboard() {
                     </div>
                     <h3 className="text-slate-500 font-semibold text-sm uppercase tracking-wider">Total Received Funds</h3>
                     <p className="text-4xl font-extrabold mt-2 text-slate-800 tracking-tight">
-                        {fundsSummaryLoading ? "..." : `₹${(fundsSummary?.totalReceivedEth || 0).toLocaleString()}`}
+                        {fundsSummaryLoading ? "..." : formatEth(fundsSummary?.totalReceivedEth)}
                     </p>
                     <p className="text-xs text-slate-500 mt-2">Released by admin</p>
                     <div className="absolute -bottom-4 -right-4 text-emerald-50/50 group-hover:scale-110 transition-transform duration-500">
                         <DollarSign size={120} />
-                    </div>
-                </Card>
-
-                {/* Pending Funds Card */}
-                <Card className="relative overflow-hidden group hover:shadow-[0_8px_30px_-4px_rgba(245,158,11,0.15)] transition-all duration-300">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="p-3 bg-amber-50 text-amber-500 rounded-2xl">
-                            <Lock size={24} strokeWidth={2.5} />
-                        </div>
-                    </div>
-                    <h3 className="text-slate-500 font-semibold text-sm uppercase tracking-wider">Pending (Locked) Funds</h3>
-                    <p className="text-4xl font-extrabold mt-2 text-slate-800 tracking-tight">
-                        {fundsSummaryLoading ? "..." : `₹${(fundsSummary?.totalPendingEth || 0).toLocaleString()}`}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-2">Awaiting admin release</p>
-                    <div className="absolute -bottom-4 -right-4 text-amber-50/50 group-hover:scale-110 transition-transform duration-500">
-                        <Lock size={120} />
                     </div>
                 </Card>
 
@@ -159,7 +78,11 @@ function NgoDashboard() {
                         </div>
                     </div>
                     <h3 className="text-slate-500 font-semibold text-sm uppercase tracking-wider">Total Possible Funds</h3>
-                    <p className="text-4xl font-extrabold mt-2 text-slate-800 tracking-tight">{isLoading ? "..." : `₹${totalGoal.toLocaleString()}`}</p>
+                    <p className="text-4xl font-extrabold mt-2 text-slate-800 tracking-tight">
+                        {isLoading || fundsSummaryLoading
+                            ? "..."
+                            : formatEth(fundsSummary?.totalPossibleEth ?? totalGoalEth)}
+                    </p>
                     <div className="absolute -bottom-4 -right-4 text-emerald-50/50 group-hover:scale-110 transition-transform duration-500">
                         <Wallet size={120} />
                     </div>
@@ -190,7 +113,7 @@ function NgoDashboard() {
                         <Inbox size={120} />
                     </div>
                 </Card>
-            </Grid>
+            </div>
 
             {/* Campaign Breakdown */}
             {!fundsSummaryLoading && fundsSummary?.campaign_milestones && fundsSummary.campaign_milestones.length > 0 && (
@@ -203,15 +126,24 @@ function NgoDashboard() {
                                 <div className="grid grid-cols-3 gap-4">
                                     <div>
                                         <p className="text-xs text-slate-500 uppercase tracking-wider">Received</p>
-                                        <p className="text-lg font-semibold text-green-600">₹{campaign.receivedEth.toLocaleString()}</p>
+                                        <p className="text-lg font-semibold text-green-600">{formatEth(campaign.receivedEth)}</p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-slate-500 uppercase tracking-wider">Pending</p>
-                                        <p className="text-lg font-semibold text-amber-600">₹{campaign.pendingEth.toLocaleString()}</p>
+                                        <p className="text-lg font-semibold text-amber-600">{formatEth(campaign.pendingEth)}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-slate-500 uppercase tracking-wider">Milestones</p>
-                                        <p className="text-lg font-semibold text-indigo-600">{campaign.milestones.length}</p>
+                                        <p className="text-xs text-slate-500 uppercase tracking-wider">Milestones Total</p>
+                                        <p className="text-lg font-semibold text-indigo-600">{formatEth(campaign.milestoneTotalEth)}</p>
+                                    </div>
+                                    <div>
+                                        <button
+                                            onClick={() => navigate('/ngo/proof')}
+                                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors duration-200"
+                                        >
+                                            <FileCheck size={20} strokeWidth={2} />
+                                            Proof Submission
+                                        </button>
                                     </div>
                                 </div>
                             </Card>
@@ -219,14 +151,6 @@ function NgoDashboard() {
                     </div>
                 </div>
             )}
-
-            {/* Wallet Address Modal */}
-            <WalletAddressModal
-                isOpen={showWalletModal}
-                onClose={() => setShowWalletModal(false)}
-                currentAddress={walletData?.walletAddress}
-                onSuccess={handleWalletUpdate}
-            />
         </div>
     );
 }

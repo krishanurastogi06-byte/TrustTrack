@@ -4,6 +4,8 @@ import CampaignCard from "../../components/ui/CampaignCard";
 import { useCampaigns } from "../../hooks/useCampaigns";
 import useDebounce from "../../utils/useDebounce";
 
+const INR_PER_ETH = 250000;
+
 function ExploreCampaigns() {
     const [searchQuery, setSearchQuery] = useState("");
     const debouncedQuery = useDebounce(searchQuery, 350);
@@ -17,8 +19,8 @@ function ExploreCampaigns() {
         title: c.title,
         description: c.summary || c.description,
         category: c.category || "General",
-        raised: 0,
-        goal: c.fundingGoal || 0,
+        raisedEth: Number(c.raisedETH || 0),
+        goalEth: Number(c.fundingGoalETH || (Number(c.fundingGoalINR || c.fundingGoal || 0) / INR_PER_ETH)),
         image: c.coverImage || "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80&w=800",
     }));
 

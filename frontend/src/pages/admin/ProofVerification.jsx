@@ -5,20 +5,30 @@ import Badge from "../../components/ui/Badge";
 import { FileSearch, Check, X, ExternalLink, Trash2, Coins } from "lucide-react";
 import { useAdminProofs, useDeleteMilestone, useRejectProof, useReleaseMilestoneFunds, useVerifyProof } from "../../hooks/useProofs";
 import { useState } from "react";
+import { useAuthStore } from "../../store/useAuthStore";
 
 function ProofVerification() {
-    const headers = ["NGO Name", "Milestone", "Proof Document", "Status", "Action"];
+    const headers = ["Campaign Name", "NGO Name", "NGO Wallet Address", "Tx Hash", "Milestone", "Amount (ETH)", "Proof Document", "Status", "Action"];
+    const initialized = useAuthStore((state) => state.initialized);
+    const role = useAuthStore((state) => state.role);
     const [actionError, setActionError] = useState("");
     const [actionSuccess, setActionSuccess] = useState("");
-    const { data, isLoading, isError, error, refetch } = useAdminProofs();
+    const [releaseInfo, setReleaseInfo] = useState(null);
+    const { data, isLoading, isError, error, refetch } = useAdminProofs({}, { enabled: initialized && role === "admin" });
     const verifyMutation = useVerifyProof();
     const rejectMutation = useRejectProof();
     const releaseMutation = useReleaseMilestoneFunds({
-        onSuccess: () => {
+        onSuccess: (result) => {
             setActionError("");
             setActionSuccess("Funds released successfully.");
+            setReleaseInfo({
+                txHash: result?.txHash || result?.blockchain?.txHash || "",
+                network: result?.blockchain?.network,
+                warning: result?.warning || "",
+            });
         },
         onError: (err) => {
+            setReleaseInfo(null);
             setActionSuccess("");
             setActionError(err?.message || "Failed to release funds");
         },
@@ -45,6 +55,29 @@ function ProofVerification() {
         deleteMilestoneMutation.mutate(milestoneId);
     }
 
+    function handleReleaseFunds(proof) {
+        const milestoneId = proof?.milestone?._id;
+        const expectedNgoWalletAddress = proof?.ngoWalletAddress;
+        if (!milestoneId) return;
+
+        setActionError("");
+        setActionSuccess("");
+        setReleaseInfo(null);
+        releaseMutation.mutate({ milestoneId, expectedNgoWalletAddress });
+    }
+
+    function getExplorerTxUrl(txHash, network) {
+        if (!txHash) return "";
+        if (network === 1) return `https://etherscan.io/tx/${txHash}`;
+        if (network === 11155111) return `https://sepolia.etherscan.io/tx/${txHash}`;
+        if (network === 137) return `https://polygonscan.com/tx/${txHash}`;
+        if (network === 80002) return `https://amoy.polygonscan.com/tx/${txHash}`;
+        if (network === 31337) return "";
+        return "";
+    }
+
+    const releaseExplorerUrl = getExplorerTxUrl(releaseInfo?.txHash, releaseInfo?.network);
+
     const proofs = data?.data || [];
     const rows = proofs.map((p) => {
         const status = String(p?.status || "pending").toLowerCase();
@@ -53,9 +86,30 @@ function ProofVerification() {
         const milestoneStatus = String(p?.milestone?.status || "").toLowerCase();
         const canRelease = (milestoneStatus === "approved" || milestoneStatus === "verified") && !p?.milestone?.isPaid;
 
+        const rowTxUrl = getExplorerTxUrl(p?.txHash, p?.releaseNetwork);
+
         return [
-            <span className="font-bold text-slate-800">{p?.uploader?.profile?.organizationName || p?.uploader?.email || "NGO"}</span>,
+            <span className="font-semibold text-slate-700">{p?.campaignName || "-"}</span>,
+            <span className="font-bold text-slate-800">{p?.ngoName || p?.uploader?.profile?.organizationName || p?.uploader?.email || "NGO"}</span>,
+            <span className="font-mono text-xs text-slate-600 break-all max-w-[240px] inline-block">{p?.ngoWalletAddress || "-"}</span>,
+            p?.txHash ? (
+                rowTxUrl ? (
+                    <a
+                        href={rowTxUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-indigo-600 font-semibold hover:underline break-all"
+                    >
+                        {`${String(p.txHash).slice(0, 10)}...${String(p.txHash).slice(-8)}`}
+                    </a>
+                ) : (
+                    <span className="font-mono text-xs text-slate-700 break-all">{p.txHash}</span>
+                )
+            ) : (
+                <span className="text-xs text-slate-400">-</span>
+            ),
             <span className="text-slate-600 font-medium bg-slate-100 px-3 py-1 rounded-lg text-sm">{p?.milestone?.title || "Milestone"}</span>,
+            <span className="text-slate-700 font-semibold">{Number(p?.amountETH ?? p?.milestone?.amount ?? 0).toFixed(6)}</span>,
             <a href={`https://ipfs.io/ipfs/${p.cid}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-indigo-600 font-bold hover:text-indigo-700 hover:underline transition-colors">
                 <ExternalLink size={16} /> View Document
             </a>,
@@ -93,11 +147,7 @@ function ProofVerification() {
                             type="success"
                             className="!px-3 !py-1.5 text-xs"
                             disabled={releaseMutation.isPending}
-                            onClick={() => {
-                                setActionError("");
-                                setActionSuccess("");
-                                releaseMutation.mutate(p?.milestone?._id);
-                            }}
+                            onClick={() => handleReleaseFunds(p)}
                         >
                             <Coins size={16} /> Release Funds
                         </Button>
@@ -112,11 +162,7 @@ function ProofVerification() {
                             type="success"
                             className="!px-3 !py-1.5 text-xs"
                             disabled={releaseMutation.isPending}
-                            onClick={() => {
-                                setActionError("");
-                                setActionSuccess("");
-                                releaseMutation.mutate(p?.milestone?._id);
-                            }}
+                            onClick={() => handleReleaseFunds(p)}
                         >
                             <Coins size={16} /> Release Funds
                         </Button>
@@ -154,7 +200,28 @@ function ProofVerification() {
 
                 {actionSuccess && (
                     <div className="mx-6 mt-5 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
-                        {actionSuccess}
+                        <p>{actionSuccess}</p>
+                        {releaseInfo?.txHash && (
+                            <p className="mt-1 text-xs font-semibold break-all">
+                                Tx Hash: {releaseInfo.txHash}
+                                {releaseExplorerUrl && (
+                                    <>
+                                        {" "}
+                                        <a
+                                            href={releaseExplorerUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-emerald-800 underline"
+                                        >
+                                            View on explorer
+                                        </a>
+                                    </>
+                                )}
+                            </p>
+                        )}
+                        {releaseInfo?.warning && (
+                            <p className="mt-1 text-xs text-amber-700">{releaseInfo.warning}</p>
+                        )}
                     </div>
                 )}
 

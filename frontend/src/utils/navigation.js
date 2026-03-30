@@ -15,8 +15,7 @@ export const ngoLinks = [
     { label: "Campaigns", path: "/ngo/campaigns", icon: Folder },
     { label: "Create Campaign", path: "/ngo/create", icon: PlusCircle },
     { label: "Submit Proof", path: "/ngo/proof", icon: Upload },
-    { label: "Fund Requests", path: "/ngo/requests", icon: FileText },
-    { label: "Analytics", path: "/ngo/analytics", icon: BarChart },
+    { label: "Wallet", path: "/ngo/wallet", icon: Wallet },
 ];
 
 // ADMIN

@@ -39,6 +39,7 @@ function EditCampaign() {
     const { id } = useParams();
     const navigate = useNavigate();
     const [submitError, setSubmitError] = useState("");
+    const INR_PER_ETH = 250000;
 
     const { data, isLoading, isError, error, refetch } = useCampaign(id, { enabled: !!id });
     const campaign = data?.campaign;
@@ -55,6 +56,7 @@ function EditCampaign() {
     const {
         register,
         control,
+        watch,
         handleSubmit,
         reset,
         formState: { errors, isValid },
@@ -65,6 +67,15 @@ function EditCampaign() {
     });
 
     const { fields, append, remove } = useFieldArray({ control, name: "milestones" });
+    const milestones = watch("milestones");
+
+    const formatEth = useMemo(() => {
+        return (amountInr) => {
+            const amount = Number(amountInr);
+            if (!Number.isFinite(amount) || amount <= 0) return "-";
+            return `${(amount / INR_PER_ETH).toFixed(6)} ETH`;
+        };
+    }, [INR_PER_ETH]);
 
     useEffect(() => {
         if (!campaign) return;
@@ -73,11 +84,11 @@ function EditCampaign() {
             category: campaign.category || "",
             coverImageUrl: campaign.coverImage || "",
             description: campaign.description || "",
-            fundingGoal: Number(campaign.fundingGoal || 0),
+            fundingGoal: Number(campaign.fundingGoalINR ?? campaign.fundingGoal ?? 0),
             milestones: (data?.milestones || []).map((m) => ({
                 id: m._id || m.id,
                 title: m.title || "",
-                amount: Number(m.amount || 0),
+                amount: Number(m.milestoneAmountINR ?? m.amountINR ?? m.amount ?? 0),
                 description: m.description || "",
             })),
         });
@@ -102,11 +113,15 @@ function EditCampaign() {
             category: values.category,
             coverImage: values.coverImageUrl || undefined,
             fundingGoal: Number(values.fundingGoal),
+            fundingGoalINR: Number(values.fundingGoal),
+            fundingGoalETH: Number(values.fundingGoal) / INR_PER_ETH,
             milestones: (values.milestones || []).map((m) => ({
                 ...(m.id ? { id: m.id } : {}),
                 title: m.title,
                 description: m.description || m.title,
                 amount: Number(m.amount),
+                milestoneAmountINR: Number(m.amount),
+                milestoneAmountETH: Number(m.amount) / INR_PER_ETH,
             })),
         });
     }
@@ -229,13 +244,24 @@ function EditCampaign() {
                                             )}
                                         </div>
 
-                                        <div className="flex gap-3 items-center">
-                                            <input
-                                                {...register(`milestones.${idx}.amount`, { valueAsNumber: true })}
-                                                placeholder="Amount (₹)"
-                                                type="number"
-                                                className={`w-full border ${errors?.milestones?.[idx]?.amount ? "border-red-400" : "border-slate-200"} bg-white px-4 py-3.5 rounded-xl focus:outline-none transition-all text-slate-700`}
-                                            />
+                                        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_120px_auto] gap-3 items-center">
+                                            <div>
+                                                <input
+                                                    {...register(`milestones.${idx}.amount`, { valueAsNumber: true })}
+                                                    placeholder="Amount (₹)"
+                                                    type="number"
+                                                    className={`w-full border ${errors?.milestones?.[idx]?.amount ? "border-red-400" : "border-slate-200"} bg-white px-4 py-3.5 rounded-xl focus:outline-none transition-all text-slate-700`}
+                                                />
+                                                {errors?.milestones?.[idx]?.amount && (
+                                                    <p className="text-xs text-red-600 mt-1">{errors.milestones[idx].amount.message}</p>
+                                                )}
+                                            </div>
+
+                                            <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-right">
+                                                <p className="text-[10px] uppercase tracking-wide text-indigo-500 font-semibold">Approx ETH</p>
+                                                <p className="text-xs font-bold text-indigo-700">{formatEth(milestones?.[idx]?.amount)}</p>
+                                            </div>
+
                                             <button type="button" onClick={() => remove(idx)} className="text-red-600 hover:text-red-700 px-3 py-2">Remove</button>
                                         </div>
                                     </div>

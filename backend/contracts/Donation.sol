@@ -14,6 +14,8 @@ contract Donation is Ownable, ReentrancyGuard {
 
     uint256 public totalDonated;
     uint256 public totalReleased;
+    uint256 private nextCampaignId = 1;
+    uint256 private nextMilestoneId = 1;
 
     event DonationReceived(
         uint256 indexed campaignId,
@@ -52,25 +54,31 @@ contract Donation is Ownable, ReentrancyGuard {
         emit DonationReceived(campaignId, msg.sender, msg.value, campaignFunds[campaignId], block.timestamp);
     }
 
-    function registerCampaign(uint256 campaignId, address payable ngo) external onlyOwner {
-        require(campaignId > 0, "Invalid campaignId");
+    function registerCampaign(address payable ngo) external onlyOwner returns (uint256) {
         require(ngo != address(0), "Invalid NGO address");
 
+        uint256 campaignId = nextCampaignId;
+        nextCampaignId += 1;
         campaignNgoWallet[campaignId] = ngo;
         emit CampaignRegistered(campaignId, ngo, block.timestamp);
+        
+        return campaignId;
     }
 
-    function registerMilestone(uint256 milestoneId, uint256 campaignId, uint256 amountWei) external onlyOwner {
-        require(milestoneId > 0, "Invalid milestoneId");
+    function registerMilestone(uint256 campaignId, uint256 amountWei) external onlyOwner returns (uint256) {
         require(campaignId > 0, "Invalid campaignId");
         require(amountWei > 0, "Invalid milestone amount");
         require(campaignNgoWallet[campaignId] != address(0), "Campaign NGO wallet not registered");
 
+        uint256 milestoneId = nextMilestoneId;
+        nextMilestoneId += 1;
         milestoneToCampaign[milestoneId] = campaignId;
         milestoneReleaseAmount[milestoneId] = amountWei;
         milestoneReleased[milestoneId] = false;
 
         emit MilestoneRegistered(milestoneId, campaignId, amountWei, block.timestamp);
+        
+        return milestoneId;
     }
 
     function releaseFunds(uint256 milestoneId) external onlyOwner nonReentrant {

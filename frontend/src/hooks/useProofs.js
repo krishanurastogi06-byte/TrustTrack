@@ -77,8 +77,9 @@ export function useDeleteMilestone(options = {}) {
 export function useReleaseMilestoneFunds(options = {}) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (milestoneId) => proofService.releaseMilestoneFunds(milestoneId),
-    onMutate: async (milestoneId) => {
+    mutationFn: ({ milestoneId, remarks, expectedNgoWalletAddress }) =>
+      proofService.releaseMilestoneFunds(milestoneId, { remarks, expectedNgoWalletAddress }),
+    onMutate: async ({ milestoneId }) => {
       const key = ["admin-proofs"];
       await qc.cancelQueries({ queryKey: key });
       const previous = qc.getQueriesData({ queryKey: key });
@@ -101,7 +102,7 @@ export function useReleaseMilestoneFunds(options = {}) {
 
       return { previous };
     },
-    onError: (error, _milestoneId, context) => {
+    onError: (error, _payload, context) => {
       context?.previous?.forEach(([queryKey, previousData]) => {
         qc.setQueryData(queryKey, previousData);
       });
@@ -110,6 +111,7 @@ export function useReleaseMilestoneFunds(options = {}) {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["admin-proofs"] });
       qc.invalidateQueries({ queryKey: ["campaigns"] });
+      qc.invalidateQueries({ queryKey: ["campaign-milestones"] });
       options.onSuccess && options.onSuccess(data);
     },
   });

@@ -13,13 +13,15 @@ async function getNgoFundsSummary(ngoId) {
   }
 
   // Get all campaigns for this NGO
-  const campaigns = await Campaign.find({ ngo: ngoId }).select('_id title');
+  const campaigns = await Campaign.find({ ngo: ngoId }).select('_id title fundingGoalETH');
   
   if (!campaigns.length) {
     return {
       ngo,
       totalReceivedEth: 0,
       totalPendingEth: 0,
+      totalPossibleEth: 0,
+      totalMilestoneAmountEth: 0,
       walletAddress: ngo.walletAddress,
       campaign_milestones: [],
     };
@@ -33,31 +35,52 @@ async function getNgoFundsSummary(ngoId) {
   // Calculate funds
   let totalReceivedEth = 0;
   let totalPendingEth = 0;
+  let totalPossibleEth = 0;
+  let totalMilestoneAmountEth = 0;
   const campaignMilestones = [];
 
   campaigns.forEach((campaign) => {
     const campaignMilestoneList = milestones.filter((m) => String(m.campaign) === String(campaign._id));
-    
+    const campaignPossibleEth = Number(campaign.fundingGoalETH || 0);
+
+    const getMilestoneAmountEth = (milestone) => Number(
+      milestone?.milestoneAmountETH ?? milestone?.amountETH ?? milestone?.amount ?? 0
+    );
+
+    const campaignMilestoneTotalEth = campaignMilestoneList.reduce(
+      (sum, m) => sum + getMilestoneAmountEth(m),
+      0
+    );
+
+    // A milestone is considered released when either legacy (isPaid) or fundRequest status marks release.
     const campaignReceived = campaignMilestoneList
-      .filter((m) => m.isPaid && m.fundRequest?.status === 'released')
-      .reduce((sum, m) => sum + Number(m.fundRequest?.releasedAmount || 0), 0);
-    
+      .filter((m) => m.isPaid || m.fundRequest?.status === 'released')
+      .reduce(
+        (sum, m) => sum + Number(m.fundRequest?.releasedAmount ?? getMilestoneAmountEth(m)),
+        0
+      );
+
+    // Pending means all unreleased milestone value, regardless of request state (none/pending/rejected).
     const campaignPending = campaignMilestoneList
-      .filter((m) => !m.isPaid && m.fundRequest?.status === 'pending')
-      .reduce((sum, m) => sum + Number(m.amount || 0), 0);
+      .filter((m) => !(m.isPaid || m.fundRequest?.status === 'released'))
+      .reduce((sum, m) => sum + getMilestoneAmountEth(m), 0);
 
     totalReceivedEth += campaignReceived;
     totalPendingEth += campaignPending;
+    totalPossibleEth += campaignPossibleEth;
+    totalMilestoneAmountEth += campaignMilestoneTotalEth;
 
     campaignMilestones.push({
       campaignId: campaign._id,
       title: campaign.title,
+      possibleEth: campaignPossibleEth,
       receivedEth: campaignReceived,
       pendingEth: campaignPending,
+      milestoneTotalEth: campaignMilestoneTotalEth,
       milestones: campaignMilestoneList.map((m) => ({
         _id: m._id,
         title: m.title,
-        amount: m.amount,
+        amountEth: getMilestoneAmountEth(m),
         status: m.status,
         isPaid: m.isPaid,
         fundRequestStatus: m.fundRequest?.status,
@@ -69,6 +92,8 @@ async function getNgoFundsSummary(ngoId) {
     ngo,
     totalReceivedEth,
     totalPendingEth,
+    totalPossibleEth,
+    totalMilestoneAmountEth,
     walletAddress: ngo.walletAddress,
     campaign_milestones: campaignMilestones,
   };

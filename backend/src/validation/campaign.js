@@ -1,15 +1,21 @@
 const { z } = require('zod');
 const objectId = /^[a-f0-9]{24}$/i;
 
-const createCampaignSchema = z.object({
+const campaignBaseSchema = z.object({
   title: z.string().min(5).max(200),
   slug: z.string().min(3).max(200).regex(/^[a-z0-9-]+$/i),
   summary: z.string().max(500).optional(),
   description: z.string().min(20).max(10000),
   category: z.string().optional(),
   coverImage: z.string().url().optional(),
-  fundingGoal: z.number().min(1),
+  fundingGoal: z.number().min(1).optional(),
+  fundingGoalINR: z.number().min(1).optional(),
   tags: z.array(z.string()).optional(),
+});
+
+const createCampaignSchema = campaignBaseSchema.refine((body) => Number(body.fundingGoalINR || body.fundingGoal) > 0, {
+  message: 'fundingGoalINR is required',
+  path: ['fundingGoalINR'],
 });
 
 const campaignMilestoneInputSchema = z.object({
@@ -17,10 +23,18 @@ const campaignMilestoneInputSchema = z.object({
   title: z.string().min(3).max(200),
   description: z.string().max(2000).optional(),
   amount: z.coerce.number().min(0.01),
+  milestoneAmountINR: z.coerce.number().min(0.01).optional(),
+  milestoneAmountETH: z.coerce.number().min(0.00000001).optional(),
 });
 
-const updateCampaignSchema = createCampaignSchema.partial().extend({
+const updateCampaignSchema = campaignBaseSchema.partial().extend({
   milestones: z.array(campaignMilestoneInputSchema).max(100).optional(),
+}).refine((body) => {
+  if (body.fundingGoalINR == null && body.fundingGoal == null) return true;
+  return Number(body.fundingGoalINR || body.fundingGoal) > 0;
+}, {
+  message: 'fundingGoalINR must be greater than 0',
+  path: ['fundingGoalINR'],
 });
 
 const campaignIdParamSchema = z.object({

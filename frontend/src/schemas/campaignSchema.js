@@ -3,6 +3,7 @@ import { z } from "zod";
 export const milestoneSchema = z.object({
   id: z.string().optional(),
   title: z.string().min(3, "Milestone title too short").max(120),
+  order: z.coerce.number().int().min(1, "Milestone order must be at least 1"),
   amount: z
     .number({ invalid_type_error: "Amount must be a number" })
     .min(1, "Amount must be at least ₹1"),

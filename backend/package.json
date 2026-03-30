@@ -6,14 +6,16 @@
   "type": "commonjs",
   "scripts": {
     "start": "node ./src/server.js",
-    "dev": "nodemon --watch src --exec node ./src/server.js",
+    "dev": "nodemon --watch src --signal SIGTERM --delay 300ms --exec node ./src/server.js",
     "test": "jest --forceExit --testTimeout=10000",
     "test:watch": "jest --watch",
     "lint": "echo \"Add linter scripts\"",
     "hh:compile": "hardhat compile",
     "hh:node": "hardhat node",
     "hh:deploy:local": "hardhat run scripts/deploy.js --network localhost",
-    "hh:deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia"
+    "hh:deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "sync:onchain": "node scripts/syncOnChainMappings.js",    
+    "migrate:contract-ids": "node scripts/migrateToContractGeneratedIds.js"
   },
   "keywords": [],
   "author": "",

@@ -1,10 +1,26 @@
 import { useEffect, useState, useCallback } from "react";
 import { ethers } from "ethers";
+import { useAuthStore } from "../store/useAuthStore";
 
 const WALLET_STORAGE_KEY = "trusttrack_wallet_state";
 const WALLET_ACCOUNT_KEY = "trusttrack_wallet_account";
 const WALLET_CHAIN_KEY = "trusttrack_wallet_chain";
 const TARGET_CHAIN_ID = Number(import.meta.env.VITE_CHAIN_ID || 31337);
+
+function getWalletStorageKeys(roleScope) {
+  const suffix = roleScope ? `_${roleScope}` : "";
+  return {
+    WALLET_STORAGE_KEY: `${WALLET_STORAGE_KEY}${suffix}`,
+    WALLET_ACCOUNT_KEY: `${WALLET_ACCOUNT_KEY}${suffix}`,
+    WALLET_CHAIN_KEY: `${WALLET_CHAIN_KEY}${suffix}`,
+  };
+}
+
+function getPreferredAccountIndex(roleScope) {
+  if (roleScope === "ngo") return 1;
+  if (roleScope === "donor") return 0;
+  return 0;
+}
 
 function shortAddress(address = "") {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -13,12 +29,13 @@ function shortAddress(address = "") {
 /**
  * Persist wallet state to localStorage
  */
-function persistWalletState(account, chainId) {
+function persistWalletState(account, chainId, roleScope) {
+  const keys = getWalletStorageKeys(roleScope);
   try {
     if (account && chainId) {
-      localStorage.setItem(WALLET_ACCOUNT_KEY, account);
-      localStorage.setItem(WALLET_CHAIN_KEY, String(chainId));
-      localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify({ account, chainId }));
+      localStorage.setItem(keys.WALLET_ACCOUNT_KEY, account);
+      localStorage.setItem(keys.WALLET_CHAIN_KEY, String(chainId));
+      localStorage.setItem(keys.WALLET_STORAGE_KEY, JSON.stringify({ account, chainId }));
     }
   } catch (e) {
     console.warn("Failed to persist wallet state to localStorage:", e);
@@ -28,15 +45,16 @@ function persistWalletState(account, chainId) {
 /**
  * Retrieve wallet state from localStorage
  */
-function retrieveWalletState() {
+function retrieveWalletState(roleScope) {
+  const keys = getWalletStorageKeys(roleScope);
   try {
-    const stored = localStorage.getItem(WALLET_STORAGE_KEY);
+    const stored = localStorage.getItem(keys.WALLET_STORAGE_KEY);
     if (stored) {
       return JSON.parse(stored);
     }
     // Fallback to individual keys for backward compatibility
-    const account = localStorage.getItem(WALLET_ACCOUNT_KEY);
-    const chainId = localStorage.getItem(WALLET_CHAIN_KEY);
+    const account = localStorage.getItem(keys.WALLET_ACCOUNT_KEY);
+    const chainId = localStorage.getItem(keys.WALLET_CHAIN_KEY);
     if (account && chainId) {
       return { account, chainId: parseInt(chainId, 10) };
     }
@@ -49,17 +67,21 @@ function retrieveWalletState() {
 /**
  * Clear wallet state from localStorage
  */
-function clearWalletState() {
+function clearWalletState(roleScope) {
+  const keys = getWalletStorageKeys(roleScope);
   try {
-    localStorage.removeItem(WALLET_STORAGE_KEY);
-    localStorage.removeItem(WALLET_ACCOUNT_KEY);
-    localStorage.removeItem(WALLET_CHAIN_KEY);
+    localStorage.removeItem(keys.WALLET_STORAGE_KEY);
+    localStorage.removeItem(keys.WALLET_ACCOUNT_KEY);
+    localStorage.removeItem(keys.WALLET_CHAIN_KEY);
   } catch (e) {
     console.warn("Failed to clear wallet state from localStorage:", e);
   }
 }
 
-export function useWallet() {
+export function useWallet(options = {}) {
+  const roleFromStore = useAuthStore((state) => state.role);
+  const roleScope = options.role || roleFromStore || "shared";
+  const preferredAccountIndex = getPreferredAccountIndex(roleScope);
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
   const [account, setAccount] = useState(null);
@@ -106,7 +128,9 @@ export function useWallet() {
   const initializeProvider = useCallback(async (targetAccount) => {
     try {
       const web3Provider = new ethers.BrowserProvider(window.ethereum, "any");
-      const nextSigner = await web3Provider.getSigner();
+      const nextSigner = targetAccount
+        ? await web3Provider.getSigner(targetAccount)
+        : await web3Provider.getSigner();
       const network = await web3Provider.getNetwork();
       const id = Number(network.chainId);
 
@@ -152,8 +176,14 @@ export function useWallet() {
         throw new Error("No accounts returned from MetaMask");
       }
 
-      const signer = await web3Provider.getSigner();
-      const connectedAccount = accounts[0];
+      const connectedAccount = accounts[preferredAccountIndex];
+      if (!connectedAccount) {
+        if (roleScope === "ngo") {
+          throw new Error("NGO wallet requires MetaMask Account #2. Please add/select a second account.");
+        }
+        throw new Error("No eligible account found for this role");
+      }
+      const signer = await web3Provider.getSigner(connectedAccount);
       const network = await web3Provider.getNetwork();
       const id = Number(network.chainId);
 
@@ -164,14 +194,14 @@ export function useWallet() {
       setError(null);
 
       // Persist to localStorage
-      persistWalletState(connectedAccount, id);
+      persistWalletState(connectedAccount, id, roleScope);
 
       return { provider: web3Provider, signer, account: connectedAccount, chainId: id };
     } catch (err) {
       setError(err);
       throw err;
     }
-  }, [isMetaMaskAvailable, ensureHardhatNetwork]);
+  }, [isMetaMaskAvailable, ensureHardhatNetwork, preferredAccountIndex, roleScope]);
 
   /**
    * Disconnect wallet and clear all state
@@ -182,8 +212,8 @@ export function useWallet() {
     setAccount(null);
     setChainId(null);
     setError(null);
-    clearWalletState();
-  }, []);
+    clearWalletState(roleScope);
+  }, [roleScope]);
 
   /**
    * Effect 1: Auto-reconnect on app load from localStorage
@@ -198,8 +228,27 @@ export function useWallet() {
     let isMounted = true;
 
     async function autoReconnect() {
-      const stored = retrieveWalletState();
+      const stored = retrieveWalletState(roleScope);
       if (!stored) {
+        try {
+          const web3Provider = new ethers.BrowserProvider(window.ethereum, "any");
+          const accounts = await web3Provider.send("eth_accounts", []);
+          const preferredAccount = accounts[preferredAccountIndex] || null;
+          if (preferredAccount) {
+            const signer = await web3Provider.getSigner(preferredAccount);
+            const network = await web3Provider.getNetwork();
+            const id = Number(network.chainId);
+            if (isMounted) {
+              setProvider(web3Provider);
+              setSigner(signer);
+              setAccount(preferredAccount);
+              setChainId(id);
+              persistWalletState(preferredAccount, id, roleScope);
+            }
+          }
+        } catch (_e) {
+          // Ignore silent auto-reconnect failures.
+        }
         isMounted && setIsInitialized(true);
         return;
       }
@@ -214,11 +263,11 @@ export function useWallet() {
         if (isMounted) {
           if (initializedAccount) {
             // Account is still available, update chainId and persist
-            persistWalletState(initializedAccount, storedChainId);
+            persistWalletState(initializedAccount, storedChainId, roleScope);
             console.debug("Wallet auto-restored from localStorage:", initializedAccount);
           } else {
             // Stored account is no longer available
-            clearWalletState();
+            clearWalletState(roleScope);
             console.debug("Stored wallet no longer available, cleared local state");
           }
           setIsInitialized(true);
@@ -226,7 +275,7 @@ export function useWallet() {
       } catch (err) {
         // Error during auto-reconnection, clear state but don't throw
         if (isMounted) {
-          clearWalletState();
+          clearWalletState(roleScope);
           console.warn("Auto-reconnection failed:", err);
           setIsInitialized(true);
         }
@@ -238,7 +287,7 @@ export function useWallet() {
     return () => {
       isMounted = false;
     };
-  }, [isMetaMaskAvailable, initializeProvider, ensureHardhatNetwork]);
+  }, [isMetaMaskAvailable, initializeProvider, ensureHardhatNetwork, preferredAccountIndex, roleScope]);
 
   /**
    * Effect 2: Listen for account and chain changes from MetaMask
@@ -253,7 +302,16 @@ export function useWallet() {
         return;
       }
 
-      const newAccount = accounts[0];
+      const newAccount = accounts[preferredAccountIndex];
+      if (!newAccount) {
+        if (roleScope === "ngo") {
+          setError(new Error("NGO wallet requires MetaMask Account #2. Please switch to second account."));
+          disconnect();
+          return;
+        }
+        disconnect();
+        return;
+      }
       setAccount(newAccount);
 
       // Update provider and signer
@@ -268,7 +326,7 @@ export function useWallet() {
         setChainId(id);
 
         // Persist the new account
-        persistWalletState(newAccount, id);
+        persistWalletState(newAccount, id, roleScope);
       } catch (err) {
         console.warn("Failed to update provider after account change:", err);
         // Preserve current signer state
@@ -281,7 +339,7 @@ export function useWallet() {
 
       // Persist updated chainId with current account
       if (account) {
-        persistWalletState(account, id);
+        persistWalletState(account, id, roleScope);
       }
     };
 
@@ -303,7 +361,7 @@ export function useWallet() {
         // Ignore cleanup errors
       }
     };
-  }, [isMetaMaskAvailable, account, disconnect]);
+  }, [isMetaMaskAvailable, account, disconnect, roleScope, preferredAccountIndex]);
 
   return {
     provider,

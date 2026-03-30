@@ -43,9 +43,9 @@ export async function deleteMilestone(milestoneId) {
   return res.data;
 }
 
-export async function releaseMilestoneFunds(milestoneId) {
+export async function releaseMilestoneFunds(milestoneId, payload = {}) {
   if (!milestoneId) throw new Error("milestoneId is required");
-  const res = await api.post(`/admin/milestones/${milestoneId}/release`);
+  const res = await api.post(`/admin/milestones/${milestoneId}/release`, payload);
   return res.data;
 }
 

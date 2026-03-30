@@ -1,9 +1,9 @@
 {
   "network": "localhost",
-  "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
   "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "deployedAt": "2026-03-27T17:08:31.931Z",
+  "deployedAt": "2026-03-30T04:21:20.125Z",
   "abi": [
     {
       "inputs": [
@@ -383,28 +383,24 @@
     {
       "inputs": [
         {
-          "internalType": "uint256",
-          "name": "campaignId",
-          "type": "uint256"
-        },
-        {
           "internalType": "address payable",
           "name": "ngo",
           "type": "address"
         }
       ],
       "name": "registerCampaign",
-      "outputs": [],
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
       "stateMutability": "nonpayable",
       "type": "function"
     },
     {
       "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "milestoneId",
-          "type": "uint256"
-        },
         {
           "internalType": "uint256",
           "name": "campaignId",
@@ -417,7 +413,13 @@
         }
       ],
       "name": "registerMilestone",
-      "outputs": [],
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
       "stateMutability": "nonpayable",
       "type": "function"
     },

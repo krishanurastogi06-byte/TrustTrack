@@ -26,7 +26,7 @@ function NgoVerification() {
     const rejectMutation = useRejectNgo({
         onSuccess: () => {
             setActionError("");
-            setActionSuccess("NGO rejected.");
+            setActionSuccess("NGO rejected and account deleted.");
         },
         onError: (err) => {
             setActionSuccess("");

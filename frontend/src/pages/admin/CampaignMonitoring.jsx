@@ -5,12 +5,18 @@ import Button from "../../components/ui/Button";
 import { Activity, Check, X, AlertCircle, CheckCircle } from "lucide-react";
 import { useAdminCampaigns, useRejectCampaign, useVerifyCampaign } from "../../hooks/useCampaigns";
 import { useState } from "react";
+import { useAuthStore } from "../../store/useAuthStore";
 
 function CampaignMonitoring() {
+    const initialized = useAuthStore((state) => state.initialized);
+    const role = useAuthStore((state) => state.role);
     const headers = ["Campaign Name", "Funds Raised", "NGO Wallet", "Status", "Actions"];
     const [actionError, setActionError] = useState("");
     const [actionSuccess, setActionSuccess] = useState("");
-    const { data, isLoading, isError, error, refetch } = useAdminCampaigns({ perPage: 100 });
+    const { data, isLoading, isError, error, refetch } = useAdminCampaigns(
+        { perPage: 100 },
+        { enabled: initialized && role === "admin" }
+    );
     const verifyMutation = useVerifyCampaign({
         onSuccess: () => {
             setActionError("");

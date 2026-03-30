@@ -59,8 +59,20 @@ async function getNgoProfile(req, res, next) {
       return fail(res, { status: 404, error: 'NGO not found', code: 'NGO_NOT_FOUND' });
     }
 
+    let walletConflictWithDonor = false;
+    if (ngo.walletAddress) {
+      walletConflictWithDonor = !!(await User.exists({
+        _id: { $ne: ngo._id },
+        role: 'donor',
+        walletAddress: ngo.walletAddress,
+      }));
+    }
+
+    const ngoPayload = ngo.toJSON();
+    ngoPayload.walletConflictWithDonor = walletConflictWithDonor;
+
     return success(res, {
-      data: ngo,
+      data: ngoPayload,
       legacyKey: 'profile',
       message: 'NGO profile retrieved',
     });
@@ -97,7 +109,22 @@ async function updateNgoProfile(req, res, next) {
     }
 
     if (req.body.walletAddress) {
-      updateData.walletAddress = req.body.walletAddress.toLowerCase();
+      const nextWalletAddress = req.body.walletAddress.toLowerCase();
+
+      const addressInUseByOthers = await User.exists({
+        _id: { $ne: ngo._id },
+        walletAddress: nextWalletAddress,
+      });
+
+      if (addressInUseByOthers) {
+        return fail(res, {
+          status: 409,
+          error: 'Wallet address is already linked to another user',
+          code: 'WALLET_ADDRESS_ALREADY_IN_USE',
+        });
+      }
+
+      updateData.walletAddress = nextWalletAddress;
     }
 
     if (Object.keys(updateData).length === 0) {

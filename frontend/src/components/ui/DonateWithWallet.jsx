@@ -11,20 +11,47 @@ function toEtherscan(txHash, chainId) {
   return (mapping[chainId] || "https://etherscan.io/tx/") + txHash;
 }
 
-export default function DonateWithWallet({ contractAddress, abi = null, campaignId }) {
+export default function DonateWithWallet({ contractAddress, abi = null, campaignId, contractCampaignId, remainingEth = null, onDonationConfirmed = null }) {
   const { account, shortAccount, connect, isConnected, chainId, isMetaMaskAvailable, isInitialized } = useWallet();
-  const recipientAddress = contractAddress || account;
-  const isTestRecipientMode = !contractAddress && Boolean(account);
-  const { donate, status, txHash, error } = useDonateWithWallet({ contractAddress: recipientAddress, abi, confirmations: 1 });
+  const recipientAddress = contractAddress;
+  const isTestRecipientMode = false;
+  const { donate, status, txHash, error } = useDonateWithWallet({
+    contractAddress: recipientAddress,
+    abi,
+    confirmations: 1,
+    onConfirmed: onDonationConfirmed,
+  });
 
   const [amount, setAmount] = useState("0.01");
   const [loading, setLoading] = useState(false);
+  const [validationError, setValidationError] = useState("");
+
+  const parsedAmount = Number(amount || 0);
+  const hasRemainingLimit = Number.isFinite(Number(remainingEth));
+  const safeRemaining = hasRemainingLimit ? Math.max(0, Number(remainingEth)) : null;
+  const isCampaignFunded = hasRemainingLimit && safeRemaining <= 0;
+  const exceedsRemaining = hasRemainingLimit && Number.isFinite(parsedAmount) && parsedAmount > safeRemaining + 1e-12;
+
+  function validateAmount(nextAmountRaw) {
+    const nextAmount = Number(nextAmountRaw || 0);
+    if (!Number.isFinite(nextAmount) || nextAmount <= 0) {
+      return "Enter a valid donation amount";
+    }
+    if (hasRemainingLimit && nextAmount > safeRemaining + 1e-12) {
+      return `Max donation allowed is ${safeRemaining.toFixed(6)} ETH`;
+    }
+    return "";
+  }
 
   async function onDonate(e) {
     e.preventDefault();
+    const nextError = validateAmount(amount);
+    setValidationError(nextError);
+    if (isCampaignFunded || nextError) return;
+
     setLoading(true);
     try {
-      await donate({ amountEth: amount, campaignId, metadata: { ui: "donation-widget" } });
+      await donate({ amountEth: amount, campaignId, contractCampaignId, metadata: { ui: "donation-widget" } });
       // On success, handle UI in effect of status
     } catch (err) {
       console.error(err);
@@ -62,7 +89,13 @@ export default function DonateWithWallet({ contractAddress, abi = null, campaign
 
       {!contractAddress && (
         <div className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-md p-2 mb-3">
-          Smart contract address is missing. Set VITE_DONATION_CONTRACT in your environment. Until then, this widget uses test mode and sends to your connected wallet.
+          Smart contract address is missing. Set VITE_DONATION_CONTRACT in your environment to enable donations.
+        </div>
+      )}
+
+      {!contractCampaignId && (
+        <div className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-md p-2 mb-3">
+          Campaign is not synced on-chain yet. Donation is disabled until contractCampaignId is available.
         </div>
       )}
 
@@ -85,26 +118,52 @@ export default function DonateWithWallet({ contractAddress, abi = null, campaign
         </div>
       )}
 
+      {hasRemainingLimit && (
+        <div className="mb-3 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-md p-2">
+          Remaining: <strong>{safeRemaining.toFixed(6)} ETH</strong>
+        </div>
+      )}
+
+      {isCampaignFunded && (
+        <div className="mb-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md p-2">
+          Campaign goal reached
+        </div>
+      )}
+
       <form onSubmit={onDonate} className="space-y-3">
         <div>
           <label className="text-sm font-semibold">Amount (ETH)</label>
           <input
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setAmount(nextValue);
+              setValidationError(validateAmount(nextValue));
+            }}
             type="number"
             step="0.0001"
             min="0.0001"
+            max={hasRemainingLimit ? safeRemaining : undefined}
             className="w-full border border-slate-200 rounded-md px-3 py-2 mt-1"
           />
+          {validationError && (
+            <p className="text-xs text-red-600 mt-1">{validationError}</p>
+          )}
         </div>
 
         <div>
           <button
             type="submit"
-            disabled={!isConnected || !recipientAddress || loading || status === "pending"}
+            disabled={!isConnected || !recipientAddress || !contractCampaignId || loading || status === "pending" || exceedsRemaining || isCampaignFunded}
             className="w-full inline-flex items-center justify-center bg-indigo-600 text-white px-4 py-2 rounded-md disabled:opacity-60"
           >
-            {status === "pending" ? "Waiting for confirmation…" : loading ? "Sending…" : "Donate"}
+            {isCampaignFunded
+              ? "Campaign goal reached"
+              : status === "pending"
+                ? "Waiting for confirmation…"
+                : loading
+                  ? "Sending…"
+                  : "Donate"}
           </button>
         </div>
       </form>

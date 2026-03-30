@@ -76,4 +76,38 @@ async function me(req, res, next) {
   }
 }
 
-module.exports = { register, login, refresh, me };
+async function updateWallet(req, res, next) {
+  try {
+    const walletAddress = String(req.body.walletAddress || '').toLowerCase();
+    const userId = req.user.sub;
+
+    const user = await User.findById(userId);
+    if (!user) return fail(res, { status: 404, error: 'User not found', code: 'USER_NOT_FOUND' });
+
+    const addressInUseByOthers = await User.exists({
+      _id: { $ne: user._id },
+      walletAddress,
+    });
+
+    if (addressInUseByOthers) {
+      return fail(res, {
+        status: 409,
+        error: 'Wallet address is already linked to another user',
+        code: 'WALLET_ADDRESS_ALREADY_IN_USE',
+      });
+    }
+
+    user.walletAddress = walletAddress;
+    await user.save();
+
+    return success(res, {
+      data: user.toJSON(),
+      legacyKey: 'user',
+      message: 'Wallet address updated',
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { register, login, refresh, me, updateWallet };
