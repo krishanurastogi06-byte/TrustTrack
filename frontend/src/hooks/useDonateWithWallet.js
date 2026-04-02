@@ -15,6 +15,8 @@ export function useDonateWithWallet({ contractAddress, abi = null, confirmations
   const [txHash, setTxHash] = useState(null);
   const [error, setError] = useState(null);
 
+  const isPositiveBigInt = (value) => typeof value === "bigint" && value > 0n;
+
   const donate = useCallback(
     async ({ amountEth, campaignId, contractCampaignId, metadata = {} }) => {
       setError(null);
@@ -63,7 +65,49 @@ export function useDonateWithWallet({ contractAddress, abi = null, confirmations
           throw new Error("donate(campaignId) function not found in contract ABI");
         }
 
-        const txResponse = await contract.donate(campaignChainId, { value });
+        const provider = activeSigner.provider;
+        const safePriorityFloor = ethers.parseUnits("30", "gwei");
+
+        let feeData = null;
+        if (provider?.getFeeData) {
+          try {
+            feeData = await provider.getFeeData();
+          } catch (feeError) {
+            console.warn("[donate] provider.getFeeData() failed, using safe fallback", feeError);
+          }
+        }
+
+        const providerPriority = isPositiveBigInt(feeData?.maxPriorityFeePerGas)
+          ? feeData.maxPriorityFeePerGas
+          : null;
+        const providerMaxFee = isPositiveBigInt(feeData?.maxFeePerGas)
+          ? feeData.maxFeePerGas
+          : null;
+
+        const maxPriorityFeePerGas = providerPriority && providerPriority > safePriorityFloor
+          ? providerPriority
+          : safePriorityFloor;
+
+        const bufferedMaxFee = maxPriorityFeePerGas * 2n;
+        const maxFeePerGas = providerMaxFee && providerMaxFee >= maxPriorityFeePerGas
+          ? providerMaxFee
+          : bufferedMaxFee;
+
+        console.log("[donate] provider fee data", {
+          maxPriorityFeePerGas: feeData?.maxPriorityFeePerGas?.toString?.(),
+          maxFeePerGas: feeData?.maxFeePerGas?.toString?.(),
+          gasPrice: feeData?.gasPrice?.toString?.(),
+        });
+        console.log("[donate] chosen fee overrides", {
+          maxPriorityFeePerGas: maxPriorityFeePerGas.toString(),
+          maxFeePerGas: maxFeePerGas.toString(),
+        });
+
+        const txResponse = await contract.donate(campaignChainId, {
+          value,
+          maxPriorityFeePerGas,
+          maxFeePerGas,
+        });
 
         setTxHash(txResponse.hash);
         setStatus("pending");
@@ -71,7 +115,6 @@ export function useDonateWithWallet({ contractAddress, abi = null, confirmations
         // Wait for confirmations
         const receipt = await txResponse.wait(confirmations);
 
-        const provider = activeSigner.provider;
         if (provider) {
           const contractBalance = await provider.getBalance(contractAddress);
           console.log("Contract Balance:", ethers.formatEther(contractBalance));

@@ -5,7 +5,28 @@ import { useAuthStore } from "../store/useAuthStore";
 const WALLET_STORAGE_KEY = "trusttrack_wallet_state";
 const WALLET_ACCOUNT_KEY = "trusttrack_wallet_account";
 const WALLET_CHAIN_KEY = "trusttrack_wallet_chain";
-const TARGET_CHAIN_ID = Number(import.meta.env.VITE_CHAIN_ID || 31337);
+
+function requireClientEnv(name) {
+  const value = import.meta.env[name];
+  if (value == null || String(value).trim() === "") {
+    throw new Error(`[config] Missing required frontend environment variable: ${name}`);
+  }
+  return String(value).trim();
+}
+
+const TARGET_CHAIN_ID = Number(requireClientEnv("VITE_CHAIN_ID"));
+if (!Number.isInteger(TARGET_CHAIN_ID) || TARGET_CHAIN_ID !== 80002) {
+  throw new Error(`[config] Invalid VITE_CHAIN_ID="${import.meta.env.VITE_CHAIN_ID}". Only 80002 (Polygon Amoy) is allowed at runtime.`);
+}
+
+const TARGET_CHAIN_NAME = requireClientEnv("VITE_CHAIN_NAME");
+const TARGET_RPC_URL = requireClientEnv("VITE_CHAIN_RPC_URL");
+const TARGET_CURRENCY_SYMBOL = requireClientEnv("VITE_CHAIN_SYMBOL");
+const TARGET_EXPLORER_URL = requireClientEnv("VITE_CHAIN_EXPLORER_URL");
+
+if (TARGET_RPC_URL.toLowerCase().includes("localhost") || TARGET_RPC_URL.includes("127.0.0.1")) {
+  throw new Error(`[config] Invalid VITE_CHAIN_RPC_URL="${TARGET_RPC_URL}". Localhost RPC is not allowed at runtime.`);
+}
 
 function getWalletStorageKeys(roleScope) {
   const suffix = roleScope ? `_${roleScope}` : "";
@@ -17,7 +38,7 @@ function getWalletStorageKeys(roleScope) {
 }
 
 function getPreferredAccountIndex(roleScope) {
-  if (roleScope === "ngo") return 1;
+  if (roleScope === "ngo") return 0;
   if (roleScope === "donor") return 0;
   return 0;
 }
@@ -91,7 +112,7 @@ export function useWallet(options = {}) {
 
   const isMetaMaskAvailable = typeof window !== "undefined" && !!window.ethereum;
 
-  const ensureHardhatNetwork = useCallback(async () => {
+  const ensureTargetNetwork = useCallback(async () => {
     if (!isMetaMaskAvailable) return;
 
     const currentHex = await window.ethereum.request({ method: "eth_chainId" });
@@ -107,14 +128,19 @@ export function useWallet(options = {}) {
     } catch (err) {
       // 4902 means chain is not added in MetaMask yet.
       if (err?.code === 4902) {
+        const addChainParams = {
+          chainId: targetHex,
+          chainName: TARGET_CHAIN_NAME,
+          nativeCurrency: { name: TARGET_CURRENCY_SYMBOL, symbol: TARGET_CURRENCY_SYMBOL, decimals: 18 },
+          rpcUrls: [TARGET_RPC_URL],
+        };
+        if (TARGET_EXPLORER_URL) {
+          addChainParams.blockExplorerUrls = [TARGET_EXPLORER_URL];
+        }
+
         await window.ethereum.request({
           method: "wallet_addEthereumChain",
-          params: [{
-            chainId: targetHex,
-            chainName: "Hardhat Local",
-            nativeCurrency: { name: "Ethereum", symbol: "ETH", decimals: 18 },
-            rpcUrls: ["http://127.0.0.1:8545"],
-          }],
+          params: [addChainParams],
         });
         return;
       }
@@ -168,7 +194,7 @@ export function useWallet(options = {}) {
     }
 
     try {
-      await ensureHardhatNetwork();
+      await ensureTargetNetwork();
       const web3Provider = new ethers.BrowserProvider(window.ethereum, "any");
       // Request accounts - this shows the MetaMask popup
       const accounts = await web3Provider.send("eth_requestAccounts", []);
@@ -176,11 +202,8 @@ export function useWallet(options = {}) {
         throw new Error("No accounts returned from MetaMask");
       }
 
-      const connectedAccount = accounts[preferredAccountIndex];
+      const connectedAccount = accounts[preferredAccountIndex] || accounts[0];
       if (!connectedAccount) {
-        if (roleScope === "ngo") {
-          throw new Error("NGO wallet requires MetaMask Account #2. Please add/select a second account.");
-        }
         throw new Error("No eligible account found for this role");
       }
       const signer = await web3Provider.getSigner(connectedAccount);
@@ -201,7 +224,7 @@ export function useWallet(options = {}) {
       setError(err);
       throw err;
     }
-  }, [isMetaMaskAvailable, ensureHardhatNetwork, preferredAccountIndex, roleScope]);
+  }, [isMetaMaskAvailable, ensureTargetNetwork, preferredAccountIndex, roleScope]);
 
   /**
    * Disconnect wallet and clear all state
@@ -256,7 +279,7 @@ export function useWallet(options = {}) {
       const { account: storedAccount, chainId: storedChainId } = stored;
 
       try {
-        await ensureHardhatNetwork();
+        await ensureTargetNetwork();
         // Try to initialize provider with stored account
         const initializedAccount = await initializeProvider(storedAccount);
 
@@ -287,7 +310,7 @@ export function useWallet(options = {}) {
     return () => {
       isMounted = false;
     };
-  }, [isMetaMaskAvailable, initializeProvider, ensureHardhatNetwork, preferredAccountIndex, roleScope]);
+  }, [isMetaMaskAvailable, initializeProvider, ensureTargetNetwork, preferredAccountIndex, roleScope]);
 
   /**
    * Effect 2: Listen for account and chain changes from MetaMask
@@ -302,13 +325,8 @@ export function useWallet(options = {}) {
         return;
       }
 
-      const newAccount = accounts[preferredAccountIndex];
+      const newAccount = accounts[preferredAccountIndex] || accounts[0];
       if (!newAccount) {
-        if (roleScope === "ngo") {
-          setError(new Error("NGO wallet requires MetaMask Account #2. Please switch to second account."));
-          disconnect();
-          return;
-        }
         disconnect();
         return;
       }

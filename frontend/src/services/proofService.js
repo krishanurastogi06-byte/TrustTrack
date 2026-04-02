@@ -7,6 +7,7 @@ export async function uploadProofFile(file) {
 
   const res = await api.post("/uploads", formData, {
     headers: { "Content-Type": "multipart/form-data" },
+    timeout: 60000,
   });
   return res.data;
 }

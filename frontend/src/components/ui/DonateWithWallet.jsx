@@ -5,8 +5,10 @@ import useDonateWithWallet from "../../hooks/useDonateWithWallet";
 function toEtherscan(txHash, chainId) {
   const mapping = {
     1: "https://etherscan.io/tx/",
+    11155111: "https://sepolia.etherscan.io/tx/",
     5: "https://goerli.etherscan.io/tx/",
     137: "https://polygonscan.com/tx/",
+    80002: "https://amoy.polygonscan.com/tx/",
   };
   return (mapping[chainId] || "https://etherscan.io/tx/") + txHash;
 }

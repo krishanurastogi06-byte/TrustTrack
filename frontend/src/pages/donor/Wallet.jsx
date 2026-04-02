@@ -106,7 +106,7 @@ function Wallet() {
                                 disabled={isConnecting || !isInitialized}
                                 className={`w-full font-bold shadow-none !py-3 border ${
                                   isConnected
-                                    ? "bg-red-600 text-white hover:bg-red-700 border-red-600 cursor-pointer"
+                                    ? "bg-indigo-600 text-white hover:bg-indigo-700 border-indigo-600 cursor-pointer"
                                     : "bg-indigo-700 text-indigo-900 hover:bg-indigo-50 hover:text-indigo-900 cursor-pointer border-indigo-600"
                                 }`}
                             >

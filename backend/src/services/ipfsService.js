@@ -15,7 +15,13 @@ async function getClient() {
 
 async function addBuffer(buffer, filename) {
   const ipfs = await getClient();
-  const result = await ipfs.add({ content: buffer, path: filename });
+  const timeoutMs = Number(process.env.IPFS_UPLOAD_TIMEOUT_MS || 8000);
+  const addPromise = ipfs.add({ content: buffer, path: filename });
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(`IPFS upload timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+
+  const result = await Promise.race([addPromise, timeoutPromise]);
   // result: { cid, path, size }
   return { cid: result.cid.toString(), path: result.path, size: result.size };
 }

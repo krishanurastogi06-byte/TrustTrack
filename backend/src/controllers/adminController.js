@@ -462,7 +462,7 @@ async function getCampaignFundsDetails(req, res, next) {
   try {
     const campaigns = await Campaign.find({ status: 'published' })
       .populate('ngo', 'email profile walletAddress')
-      .select('title slug ngoWalletAddress fundingGoal status contractCampaignId');
+      .select('title slug ngoWalletAddress fundingGoal fundingGoalETH status contractCampaignId');
 
     if (!campaigns.length) {
       return success(res, {
@@ -520,6 +520,8 @@ async function getCampaignFundsDetails(req, res, next) {
 
           const contractLockedEth = Number(blockchainData.fundsEth || 0);
           const lockedFundsEth = contractLockedEth > 0 ? contractLockedEth : Math.max(0, donatedEth - releasedFundsEth);
+          const fundingGoalEth = Number(campaign.fundingGoalETH || 0);
+          const pendingEth = Math.max(0, fundingGoalEth - releasedFundsEth);
 
           return {
             campaignId: campaign._id,
@@ -533,7 +535,9 @@ async function getCampaignFundsDetails(req, res, next) {
             donatedFundsEth: donatedEth,
             lockedFundsEth,
             releasedFundsEth,
+            pendingEth,
             fundingGoal: campaign.fundingGoal,
+            fundingGoalEth,
           };
         } catch (error) {
           const milestones = await Milestone.find({ campaign: campaign._id });
@@ -541,6 +545,8 @@ async function getCampaignFundsDetails(req, res, next) {
             .filter((m) => m.isPaid)
             .reduce((sum, m) => sum + Number(m.fundRequest?.releasedAmount || 0), 0);
           const lockedFundsEth = Math.max(0, donatedEth - releasedFundsEth);
+          const fundingGoalEth = Number(campaign.fundingGoalETH || 0);
+          const pendingEth = Math.max(0, fundingGoalEth - releasedFundsEth);
 
           // Return campaign without blockchain data if fetch fails
           return {
@@ -555,7 +561,9 @@ async function getCampaignFundsDetails(req, res, next) {
             donatedFundsEth: donatedEth,
             lockedFundsEth,
             releasedFundsEth,
+            pendingEth,
             fundingGoal: campaign.fundingGoal,
+            fundingGoalEth,
             error: error?.message,
           };
         }

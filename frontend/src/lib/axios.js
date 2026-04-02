@@ -1,8 +1,10 @@
 import axios from "axios";
 import { useAuthStore } from "../store/useAuthStore";
 
-const backendOrigin = (import.meta.env.VITE_BACKEND_URL || "http://localhost:4000").replace(/\/+$/, "");
-const API_BASE = import.meta.env.VITE_API_BASE_URL || `${backendOrigin}/api`;
+const API_BASE = String(import.meta.env.VITE_API_BASE_URL || "").trim();
+if (!API_BASE) {
+  throw new Error("[config] Missing required frontend environment variable: VITE_API_BASE_URL");
+}
 
 const api = axios.create({
   baseURL: API_BASE,

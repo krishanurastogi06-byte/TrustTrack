@@ -1,38 +1,10 @@
 const express = require('express');
-const {
-	listProofs,
-	verifyProof,
-	rejectProof,
-	listNgos,
-	listVerifiedNgos,
-	verifyNgo,
-	rejectNgo,
-	getNgoCampaignsWithVerifiedProofs,
-	removeNgo,
-	listAuditLogs,
-	releaseMilestoneFunds,
-	releaseMilestoneFundsManual,
-	listAdminCampaigns,
-	verifyCampaign,
-	rejectCampaign,
-	getContractBalance,
-	getCampaignFundsDetails,
-} = require('../controllers/adminController');
+const { listProofs, verifyProof, rejectProof, listNgos, listVerifiedNgos, verifyNgo, rejectNgo, getNgoCampaignsWithVerifiedProofs, removeNgo, listAuditLogs, releaseMilestoneFunds, releaseMilestoneFundsManual, listAdminCampaigns, verifyCampaign, rejectCampaign, getContractBalance, getCampaignFundsDetails, } = require('../controllers/adminController');
 const requireAuth = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
 const validate = require('../middleware/validate');
 const { proofIdParamSchema, proofStatusQuerySchema, verifyRejectProofSchema } = require('../validation/proof');
-const {
-	ngoIdParamSchema,
-	verifyNgoSchema,
-	listNgosQuerySchema,
-	listAuditLogsQuerySchema,
-	listAdminCampaignsQuerySchema,
-	milestoneIdParamSchema,
-	campaignIdParamSchema,
-	releaseFundsSchema,
-	manualReleaseSchema,
-} = require('../validation/admin');
+const { ngoIdParamSchema, verifyNgoSchema, listNgosQuerySchema, listAuditLogsQuerySchema, listAdminCampaignsQuerySchema, milestoneIdParamSchema, campaignIdParamSchema, releaseFundsSchema, manualReleaseSchema, } = require('../validation/admin');
 
 const router = express.Router();
 

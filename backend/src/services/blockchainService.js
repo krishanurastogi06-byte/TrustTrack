@@ -129,14 +129,11 @@ function readDeploymentArtifact() {
 
 function getDonationContractConfig() {
   const deployment = readDeploymentArtifact();
-  const isLocalDevNetwork = ['localhost', 'hardhat'].includes(String(config.donationNetwork || '').toLowerCase());
-  const address = isLocalDevNetwork
-    ? (deployment?.address || config.donationContractAddress)
-    : (config.donationContractAddress || deployment?.address);
+  const address = config.donationContractAddress;
   const abi = deployment?.abi;
 
   if (!address || !ethers.isAddress(address)) {
-    const err = new Error('Donation contract address is not configured or invalid');
+    const err = new Error('DONATION_CONTRACT_ADDRESS is missing or invalid in environment configuration');
     err.status = 500;
     err.code = 'DONATION_CONTRACT_NOT_CONFIGURED';
     throw err;
@@ -705,12 +702,20 @@ async function releaseMilestoneFundsOnChain({ milestoneId, campaignId, ngoAddres
   }
 
   const { signer: signerWallet, contract } = createWriteContract();
+  const provider = getProvider();
   const route = await assertReleaseRouting({ campaignId, milestoneId, ngoAddress, amountEth });
   const milestoneChainId = BigInt(route.milestoneChainId);
   const { address, abi } = getDonationContractConfig();
 
+  const signerAddress = await signerWallet.getAddress();
+  const signerBalanceWei = await provider.getBalance(signerAddress);
+  const signerBalanceEth = ethers.formatEther(signerBalanceWei);
+  const network = await provider.getNetwork();
+
   console.log('Sending funds to:', route.ngoAddress);
-  console.log('Admin wallet used:', signerWallet.address);
+  console.log('Admin wallet used:', signerAddress);
+  console.log('Admin wallet POL balance:', signerBalanceEth);
+  console.log('Release network chainId:', Number(network.chainId));
   console.log('Amount (ETH):', route.releasedAmountEth);
 
   let tx;

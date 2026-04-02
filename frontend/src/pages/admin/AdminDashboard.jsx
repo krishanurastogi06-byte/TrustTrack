@@ -177,11 +177,11 @@ function AdminDashboard() {
                                 <div className="grid grid-cols-3 gap-4 pt-3 border-t border-slate-200">
                                     <div>
                                         <p className="text-xs text-slate-500 uppercase tracking-wider">Funds Goal</p>
-                                        <p className="text-lg font-semibold text-slate-800">₹{(campaign.fundingGoal || 0).toLocaleString()}</p>
+                                        <p className="text-lg font-semibold text-slate-800">{formatEthBalance(campaign.fundingGoalEth)} ETH</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-slate-500 uppercase tracking-wider">Locked (Pending)</p>
-                                        <p className="text-lg font-semibold text-amber-600">{formatEthBalance(campaign.lockedFundsEth)} ETH</p>
+                                        <p className="text-xs text-slate-500 uppercase tracking-wider">Pending</p>
+                                        <p className="text-lg font-semibold text-amber-600">{formatEthBalance(campaign.pendingEth)} ETH</p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-slate-500 uppercase tracking-wider">Released</p>

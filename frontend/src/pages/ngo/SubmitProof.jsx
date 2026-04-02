@@ -75,7 +75,8 @@ function SubmitProof() {
             setSubmitSuccess("Proof submitted successfully.");
         } catch (err) {
             console.error(err);
-            setSubmitError(err?.message || "Failed to submit proof");
+            const isTimeout = String(err?.message || "").toLowerCase().includes("timeout");
+            setSubmitError(isTimeout ? "Upload timed out. Please retry with a stable network or a smaller file." : (err?.message || "Failed to submit proof"));
         } finally {
             setSubmitting(false);
         }
