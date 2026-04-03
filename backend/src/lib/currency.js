@@ -8,7 +8,10 @@ function toNumber(value) {
 function inrToEth(amountInr) {
   const inr = toNumber(amountInr);
   if (inr <= 0) return 0;
-  return inr / INR_PER_ETH;
+  
+  // Direct division then fixed-point rounding to 15 decimals to avoid floating point noise.
+  const raw = inr / INR_PER_ETH;
+  return Number(raw.toFixed(15));
 }
 
 function ethToInr(amountEth) {

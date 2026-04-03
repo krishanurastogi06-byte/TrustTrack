@@ -23,18 +23,21 @@ if (!isTest) {
   }
 
   const donationNetwork = String(process.env.DONATION_NETWORK || '').trim();
-  if (donationNetwork !== 'polygonAmoy') {
-    throw new Error(`[config] Invalid DONATION_NETWORK="${donationNetwork}". Only "polygonAmoy" is allowed at runtime.`);
+  const isLocal = donationNetwork === 'localhost' || donationNetwork === 'hardhat';
+
+  if (donationNetwork !== 'polygonAmoy' && !isLocal) {
+    throw new Error(`[config] Invalid DONATION_NETWORK="${donationNetwork}". Only "polygonAmoy" or "localhost" is allowed at runtime.`);
   }
 
   const chainId = Number(process.env.CHAIN_ID);
-  if (!Number.isInteger(chainId) || chainId !== 80002) {
+  if (!isLocal && (!Number.isInteger(chainId) || chainId !== 80002)) {
     throw new Error(`[config] Invalid CHAIN_ID="${process.env.CHAIN_ID}". Only 80002 (Polygon Amoy) is allowed at runtime.`);
   }
 
   const ethRpcUrl = String(process.env.ETHEREUM_RPC_URL || '').trim().toLowerCase();
-  if (!ethRpcUrl || ethRpcUrl.includes('127.0.0.1') || ethRpcUrl.includes('localhost')) {
-    throw new Error('[config] ETHEREUM_RPC_URL must be a Polygon Amoy RPC endpoint and cannot point to localhost.');
+  const isRpcLocal = ethRpcUrl.includes('127.0.0.1') || ethRpcUrl.includes('localhost');
+  if (!ethRpcUrl || (!isLocal && isRpcLocal)) {
+    throw new Error('[config] ETHEREUM_RPC_URL must be a valid RPC endpoint.');
   }
 }
 

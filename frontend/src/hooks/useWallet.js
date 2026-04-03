@@ -15,8 +15,9 @@ function requireClientEnv(name) {
 }
 
 const TARGET_CHAIN_ID = Number(requireClientEnv("VITE_CHAIN_ID"));
-if (!Number.isInteger(TARGET_CHAIN_ID) || TARGET_CHAIN_ID !== 80002) {
-  throw new Error(`[config] Invalid VITE_CHAIN_ID="${import.meta.env.VITE_CHAIN_ID}". Only 80002 (Polygon Amoy) is allowed at runtime.`);
+// Allow 80002 (Amoy) or 31337 (Hardhat Local)
+if (!Number.isInteger(TARGET_CHAIN_ID) || ![80002, 31337].includes(TARGET_CHAIN_ID)) {
+  throw new Error(`[config] Invalid VITE_CHAIN_ID="${import.meta.env.VITE_CHAIN_ID}". Only 80002 (Polygon Amoy) or 31337 (Localhost) is allowed.`);
 }
 
 const TARGET_CHAIN_NAME = requireClientEnv("VITE_CHAIN_NAME");
@@ -24,8 +25,9 @@ const TARGET_RPC_URL = requireClientEnv("VITE_CHAIN_RPC_URL");
 const TARGET_CURRENCY_SYMBOL = requireClientEnv("VITE_CHAIN_SYMBOL");
 const TARGET_EXPLORER_URL = requireClientEnv("VITE_CHAIN_EXPLORER_URL");
 
-if (TARGET_RPC_URL.toLowerCase().includes("localhost") || TARGET_RPC_URL.includes("127.0.0.1")) {
-  throw new Error(`[config] Invalid VITE_CHAIN_RPC_URL="${TARGET_RPC_URL}". Localhost RPC is not allowed at runtime.`);
+// Localhost RPC is allowed for development (Chain ID 31337)
+if (TARGET_CHAIN_ID !== 31337 && (TARGET_RPC_URL.toLowerCase().includes("localhost") || TARGET_RPC_URL.includes("127.0.0.1"))) {
+  throw new Error(`[config] Invalid VITE_CHAIN_RPC_URL="${TARGET_RPC_URL}". Localhost RPC is only allowed for Localhost network (31337).`);
 }
 
 function getWalletStorageKeys(roleScope) {

@@ -5,6 +5,7 @@ const { inrToEth, ethToInr } = require('../lib/currency');
 const Campaign = require('../models/Campaign');
 const User = require('../models/User');
 const blockchainService = require('./blockchainService');
+const config = require('../config/env');
 
 async function createMilestone(campaignId, data) {
   const campaign = await Campaign.findById(campaignId).select('_id ngo ngoWalletAddress contractCampaignId');
@@ -62,15 +63,23 @@ async function createMilestone(campaignId, data) {
     : (await Milestone.countDocuments({ campaign: campaignId })) + 1;
 
   const contractCampaignId = campaign.contractCampaignId;
+  const isDev = String(config.nodeEnv || '').toLowerCase() === 'development';
+  
   if (!contractCampaignId) {
-    const err = new Error('Campaign is missing contractCampaignId. Re-sync campaign on-chain before creating milestones.');
-    err.status = 409;
-    err.code = 'CONTRACT_CAMPAIGN_ID_MISSING';
-    throw err;
+    if (isDev) {
+      console.warn(`[milestoneService] Campaign ${campaignId} missing contractCampaignId. Skipping on-chain registration in dev mode.`);
+    } else {
+      const err = new Error('Campaign is missing contractCampaignId. Re-sync campaign on-chain before creating milestones.');
+      err.status = 409;
+      err.code = 'CONTRACT_CAMPAIGN_ID_MISSING';
+      throw err;
+    }
   }
 
   // Validate campaign linkage against chain before attempting milestone registration.
-  await blockchainService.assertCampaignRegistrationOnChain(contractCampaignId);
+  if (contractCampaignId) {
+    await blockchainService.assertCampaignRegistrationOnChain(contractCampaignId);
+  }
 
   let contractMilestoneId = data.contractMilestoneId || null;
   if (blockchainService.isOnChainSyncEnabled() && !contractMilestoneId) {

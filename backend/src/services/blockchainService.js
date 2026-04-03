@@ -76,7 +76,8 @@ function toEtherAmountString(amountEth, fieldName = 'amountEth') {
   }
 
   // Normalize to non-scientific decimal string accepted by ethers.parseEther.
-  const normalized = amount.toFixed(18).replace(/\.0+$/, '').replace(/(\.\d*?[1-9])0+$/, '$1');
+  // Round to 15 decimal places to clear binary floating-point noise (like 0.04 becoming 0.04000000000000001)
+  const normalized = amount.toFixed(15).replace(/\.0+$/, '').replace(/(\.\d*?[1-9])0+$/, '$1');
   return normalized || '0';
 }
 

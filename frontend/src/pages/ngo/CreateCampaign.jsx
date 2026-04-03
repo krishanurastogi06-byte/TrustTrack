@@ -53,8 +53,10 @@ function CreateCampaign() {
     const toEthAmount = (amountInr) => {
         const amount = Number(amountInr);
         if (!Number.isFinite(amount) || amount <= 0) return "0";
-        const eth = amount / INR_PER_ETH;
-        return eth.toFixed(18).replace(/\.0+$/, "").replace(/(\.\d*?[1-9])0+$/, "$1");
+        
+        // Round raw division result to 15 decimals to clear noise (like 0.04 -> 0.040000000000000001)
+        const eth = Number((amount / INR_PER_ETH).toFixed(15));
+        return eth.toFixed(15).replace(/\.0+$/, "").replace(/(\.\d*?[1-9])0+$/, "$1");
     };
 
     const slugify = (value) =>

@@ -9,8 +9,11 @@ function toEtherscan(txHash, chainId) {
     5: "https://goerli.etherscan.io/tx/",
     137: "https://polygonscan.com/tx/",
     80002: "https://amoy.polygonscan.com/tx/",
+    31337: null
   };
-  return (mapping[chainId] || "https://etherscan.io/tx/") + txHash;
+  const base = mapping[chainId];
+  if (!base) return "";
+  return base + txHash;
 }
 
 export default function DonateWithWallet({ contractAddress, abi = null, campaignId, contractCampaignId, remainingEth = null, onDonationConfirmed = null }) {
