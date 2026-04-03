@@ -1,6 +1,6 @@
-﻿# TrustTrack
+# TrustTrack
 
-TrustTrack is a role-based donation transparency platform that combines a React frontend, Node.js/Express backend, MongoDB data layer, and a Solidity smart contract on Polygon Amoy.
+TrustTrack is a role-based donation transparency platform that combines a React frontend, Node.js/Express backend, MongoDB data layer, and a Solidity smart contract. It supports both **Local Development (Hardhat)** and **Testnet (Polygon Amoy)** environments.
 
 It is designed so donors can track where money goes, NGOs can receive milestone-based funds, and admins can verify proof before releasing escrowed funds.
 
@@ -18,9 +18,10 @@ It is designed so donors can track where money goes, NGOs can receive milestone-
 10. Frontend Folder Architecture
 11. Environment Variables
 12. Local Setup
-13. Production/Testnet Deployment
-14. Known Issues and Debug Guide
-15. Future Scope
+13. Demonstration Guide (Step-by-Step)
+14. Production/Testnet Deployment
+15. Known Issues and Debug Guide
+16. Future Scope
 
 ---
 
@@ -124,7 +125,7 @@ Responsibilities:
 - NGO starts in verification pending state.
 
 2. Wallet connect
-- NGO connects MetaMask on Polygon Amoy.
+- NGO connects MetaMask on **Localhost (Chain 31337)** or **Polygon Amoy (Chain 80002)**.
 - NGO wallet address is saved to profile.
 - Backend prevents duplicate wallet linkage across users.
 
@@ -1202,13 +1203,13 @@ JWT_SECRET=<strong_random_secret>
 CORS_ORIGIN=<frontend_origin_optional>
 TRUST_PROXY=false
 
-# Blockchain runtime (Polygon Amoy enforced)
-DONATION_NETWORK=polygonAmoy
-ETHEREUM_RPC_URL=<amoy_rpc_url>
-CHAIN_ID=80002
+# Blockchain runtime (Hardhat Local default, Amoy supported)
+DONATION_NETWORK=localhost
+ETHEREUM_RPC_URL=http://127.0.0.1:8545
+CHAIN_ID=31337
 DONATION_CONTRACT_ADDRESS=<deployed_contract_address>
-DEPLOYER_PRIVATE_KEY=<admin_or_deployer_private_key>
-DONATION_ADMIN_ADDRESS=<contract_owner_address>
+DEPLOYER_PRIVATE_KEY=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+DONATION_ADMIN_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 
 # Explorer and hardhat utilities
 ETHERSCAN_API_KEY=<polygonscan_or_etherscan_api_key>
@@ -1240,12 +1241,12 @@ ADMIN_PASSWORD=<admin_password>
 VITE_BACKEND_URL=http://localhost:4000
 VITE_API_BASE_URL=http://localhost:4000/api
 
-# Blockchain chain guard (only Amoy accepted)
-VITE_CHAIN_ID=80002
-VITE_CHAIN_NAME=Polygon Amoy
-VITE_CHAIN_RPC_URL=https://rpc-amoy.polygon.technology
-VITE_CHAIN_SYMBOL=POL
-VITE_CHAIN_EXPLORER_URL=https://amoy.polygonscan.com
+# Blockchain chain guard (Hardhat Local)
+VITE_CHAIN_ID=31337
+VITE_CHAIN_NAME=Hardhat Local
+VITE_CHAIN_RPC_URL=http://127.0.0.1:8545
+VITE_CHAIN_SYMBOL=ETH
+VITE_CHAIN_EXPLORER_URL=""
 
 # App display/config
 VITE_DONATION_CONTRACT=<deployed_contract_address>
@@ -1265,50 +1266,49 @@ VITE_INR_PER_ETH=250000
 - Polygon Amoy RPC endpoint
 - Testnet POL in wallet
 
-### Step-by-step local setup
+### Step-by-step local setup (Hardhat Node)
 
 1. Clone and install dependencies
-
 ```bash
 # from project root
-cd backend
-npm install
-
-cd ../frontend
-npm install
+cd backend && npm install
+cd ../frontend && npm install
 ```
 
-2. Configure backend env
-- Create/update `backend/.env` with values from Section 10.
-- Ensure `DONATION_NETWORK=polygonAmoy` and `CHAIN_ID=80002`.
-
-3. Configure frontend env
-- Create/update `frontend/.env` with values from Section 10.
-
-4. Start backend
-
+2. Start the Local Blockchain Node
 ```bash
 cd backend
+npx hardhat node
+```
+
+3. Deploy the Smart Contract
+Open a NEW terminal in the `backend` folder:
+```bash
+npx hardhat run scripts/deploy.js --network localhost
+```
+*Note: This will output the `DONATION_CONTRACT_ADDRESS`. Copy it.*
+
+4. Configure environment variables
+- **Backend**: Create `backend/.env` with the contract address from step 3.
+- **Frontend**: Create `frontend/.env` with the same contract address.
+
+5. Start the Backend
+Open a NEW terminal in the `backend` folder:
+```bash
 npm run dev
 ```
 
-5. Start frontend
-
+6. Start the Frontend
+Open a NEW terminal in the `frontend` folder:
 ```bash
-cd frontend
 npm run dev
 ```
 
-6. Setup MetaMask for Polygon Amoy
-- Network name: Polygon Amoy
-- Chain ID: 80002
-- RPC URL: `https://rpc-amoy.polygon.technology`
-- Symbol: POL
-- Explorer: `https://amoy.polygonscan.com`
-
-7. Get faucet POL
-- Use Polygon Amoy faucet.
-- Fund donor wallet (and admin/deployer wallet if sending admin release txs from backend).
+7. Setup MetaMask for Localhost
+- Network name: Hardhat Local
+- Chain ID: 31337
+- RPC URL: `http://127.0.0.1:8545`
+- Symbol: ETH
 
 ### Useful local commands
 
@@ -1334,7 +1334,37 @@ npm run lint
 
 ---
 
-## 13) Production/Testnet Deployment
+## 13) Demonstration Guide (Step-by-Step)
+
+Follow these steps to demonstrate the end-to-end functionality to a teacher:
+
+### Phase 1: Setup
+1. Start Hardhat Node, Deploy Contract, and Start Apps (Backend & Frontend).
+2. Login to MetaMask using any Hardhat account (e.g., Account #0).
+3. Reset MetaMask (Settings -> Advanced -> Clear activity tab data) to avoid nonce issues.
+
+### Phase 2: NGO Flow (The Request)
+1. **Register as NGO**: Sign up with a new account (role: NGO).
+2. **Setup Profile**: Connect your wallet in the NGO dashboard.
+3. **Create Campaign**: Click "Create Campaign", fill in the details (e.g., Goal: 10,000 INR).
+4. **Add Milestones**: Add at least 2 milestones for the campaign.
+
+### Phase 3: Donor Flow (The Funding)
+1. **Switch Account**: Log out and Register/Login as a **Donor**.
+2. **Find Campaign**: Browse the active campaigns and find the one created by the NGO.
+3. **Donate**: Donate an amount (e.g., 5,000 INR) using your wallet. Confirm the transaction in MetaMask.
+4. **Verify Tracking**: Show the "Funds Raised" progress bar updating in real-time.
+
+### Phase 4: Proof & Release Flow (The Transparency)
+1. **NGO Uploads Proof**: Log back in as the **NGO**. Go to the milestone and click "Upload Proof". Select a file (e.g., an invoice image) and submit.
+2. **Admin Verification**: Log in as the **Admin** (use configured admin credentials).
+3. **Review Proof**: Go to "Proof Verification", view the uploaded document, and click "Verify".
+4. **Release Funds**: Once verified, click "Release Funds".
+5. **Success**: Show that the funds have been successfully transferred from the contract escrow to the NGO's wallet address.
+
+---
+
+## 14) Production/Testnet Deployment
 
 This section assumes Polygon Amoy testnet deployment.
 
@@ -1392,7 +1422,7 @@ npm run preview
 
 ---
 
-## 14) Known Issues and Debug Guide
+## 15) Known Issues and Debug Guide
 
 ### 1. Chain mismatch
 
@@ -1489,9 +1519,30 @@ Checks:
 Fix:
 - Enable reconciliation and inspect backend logs.
 
+### 8. Insufficient campaign escrow funds (1-Wei error)
+
+Symptoms:
+- Fund release fails with "Insufficient campaign escrow funds".
+- Milestone amount is 1 Wei higher than the campaign balance.
+
+Checks:
+- This was a known floating-point precision issue in JavaScript.
+
+Fix:
+- System now uses `.toFixed(15)` rounding to eliminate binary noise.
+- For old campaigns, donate a tiny amount (e.g., 0.00001 ETH) to "rescue" the campaign.
+
+### 9. MetaMask Nonce Mismatch (Hardhat)
+
+Symptoms:
+- Transactions stay "Pending" forever or fail immediately on Localhost.
+
+Fix:
+- Go to MetaMask Settings -> Advanced -> Clear activity tab data. This resets the nonce for the local account.
+
 ---
 
-## 15) Future Scope
+## 16) Future Scope
 
 TrustTrack can evolve into a stronger public-goods platform with:
 
