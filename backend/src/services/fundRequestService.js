@@ -148,7 +148,7 @@ async function releaseFunds({ milestoneId, adminId, decision, txHash, remarks, e
 
     const contractCampaignId = campaign.contractCampaignId;
     const contractMilestoneId = milestone.contractMilestoneId;
-    if (!contractCampaignId || !contractMilestoneId) {
+    if (blockchainService.isOnChainSyncEnabled() && (!contractCampaignId || !contractMilestoneId)) {
       const err = new Error('Campaign or milestone not synced on-chain');
       err.status = 409;
       err.code = 'ONCHAIN_MAPPING_MISSING';
@@ -325,7 +325,7 @@ async function releaseApprovedMilestoneFunds({ milestoneId, adminId, txHash, rem
 
   const contractCampaignId = campaign.contractCampaignId;
   const contractMilestoneId = milestone.contractMilestoneId;
-  if (!contractCampaignId || !contractMilestoneId) {
+  if (blockchainService.isOnChainSyncEnabled() && (!contractCampaignId || !contractMilestoneId)) {
     const err = new Error('Campaign or milestone not synced on-chain');
     err.status = 409;
     err.code = 'ONCHAIN_MAPPING_MISSING';

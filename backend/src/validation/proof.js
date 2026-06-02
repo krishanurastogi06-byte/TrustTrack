@@ -7,10 +7,11 @@ const proofMilestoneParamSchema = z.object({
 });
 
 const createProofSchema = z.object({
-  cid: z.string().min(10).max(255),
+  cid: z.string().min(5).max(2048),
   filename: z.string().max(255).optional(),
   mimeType: z.string().max(120).optional(),
   size: z.coerce.number().int().nonnegative().optional(),
+  remarks: z.string().max(1000).optional(),
 });
 
 const proofIdParamSchema = z.object({

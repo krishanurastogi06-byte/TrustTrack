@@ -7,6 +7,9 @@ const { milestoneIdParamSchema, updateNgoProfileSchema, getNgoProfileParamSchema
 
 const router = express.Router();
 
+// Public list of verified NGOs (accessible to any authenticated user, e.g. donor)
+router.get('/public/list', auth, ngoController.listPublicNgos);
+
 // Profile endpoints (NGO only)
 router.get(
   '/profile',

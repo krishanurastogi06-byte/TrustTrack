@@ -25,5 +25,5 @@ export const adminLinks = [
     { label: "Verified NGOs", path: "/admin/verified-ngos", icon: BadgeCheck },
     { label: "Campaigns", path: "/admin/campaigns", icon: Folder },
     { label: "Proof Verification", path: "/admin/proofs", icon: ShieldCheck },
-    { label: "Audit Logs", path: "/admin/logs", icon: FileText },
+    // { label: "Audit Logs", path: "/admin/logs", icon: FileText },
 ];

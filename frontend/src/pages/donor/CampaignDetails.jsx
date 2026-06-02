@@ -2,12 +2,24 @@ import { useParams, useNavigate } from "react-router-dom";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
-import { ArrowLeft, CheckCircle2, CircleDashed, FileCheck } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CircleDashed, FileCheck, ExternalLink, Info } from "lucide-react";
 import { useCampaign, useCampaignMilestones } from "../../hooks/useCampaigns";
 import DonateWithWallet from "../../components/ui/DonateWithWallet";
 import donationAbi from "../../lib/contracts/donationAbi.json";
 
 const INR_PER_ETH = 250000;
+
+function proofUrlFromCid(cid) {
+    if (!cid) return null;
+    if (cid.startsWith("http://") || cid.startsWith("https://")) {
+        return cid;
+    }
+    if (cid.startsWith("local://")) {
+        const normalized = cid.replace("local://", "");
+        return `/api/uploads/local/${normalized}`;
+    }
+    return `https://ipfs.io/ipfs/${cid}`;
+}
 
 function CampaignDetails() {
     const { id } = useParams();
@@ -48,10 +60,16 @@ function CampaignDetails() {
     const remainingEth = Math.max(0, fundingGoalEth - raisedEth);
     const fundedPercentage = fundingGoalEth > 0 ? Math.min((raisedEth / fundingGoalEth) * 100, 100) : 0;
 
+    const verifiedProofs = milestones.flatMap((m) =>
+        (m.proofs || [])
+            .filter((p) => p.status === "verified")
+            .map((p) => ({ ...p, milestoneTitle: m.title }))
+    );
+
     return (
         <div className="max-w-5xl mx-auto w-full">
-            <button 
-                onClick={() => navigate(-1)} 
+            <button
+                onClick={() => navigate(-1)}
                 className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-semibold mb-6 transition-colors"
             >
                 <ArrowLeft size={18} />
@@ -61,9 +79,9 @@ function CampaignDetails() {
             <Card className="p-0 overflow-hidden mb-8 border-none shadow-[0_8px_30px_-4px_rgba(0,0,0,0.05)]">
                 {/* Hero Image */}
                 <div className="h-64 sm:h-80 md:h-96 relative w-full">
-                    <img 
+                    <img
                         src={coverImage}
-                        alt="Campaign Hero" 
+                        alt="Campaign Hero"
                         className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
@@ -92,15 +110,23 @@ function CampaignDetails() {
                                 </div>
                             ) : milestones.length ? (
                                 milestones.map((m) => (
-                                    <div key={m._id} className={`flex items-start gap-3 p-4 rounded-2xl border ${m.status === "released" || m.status === "verified" ? "bg-emerald-50 border-emerald-100" : "bg-slate-50 border-slate-100"}`}>
-                                        {m.status === "released" || m.status === "verified" ? (
-                                            <CheckCircle2 className="text-emerald-600 mt-0.5" size={20} />
-                                        ) : (
-                                            <CircleDashed className="text-slate-400 mt-0.5" size={20} />
-                                        )}
-                                        <div>
-                                            <p className="font-bold text-slate-800">{m.title}</p>
-                                            <p className="text-sm text-slate-500 mt-1 capitalize">{m.status}</p>
+                                    <div key={m._id} className={`flex items-center justify-between gap-3 p-4 rounded-2xl border ${m.status === "released" || m.status === "verified" ? "bg-emerald-50 border-emerald-100" : "bg-slate-50 border-slate-100"}`}>
+                                        <div className="flex items-start gap-3">
+                                            {m.status === "released" || m.status === "verified" ? (
+                                                <CheckCircle2 className="text-emerald-600 mt-0.5 flex-shrink-0" size={20} />
+                                            ) : (
+                                                <CircleDashed className="text-slate-400 mt-0.5 flex-shrink-0" size={20} />
+                                            )}
+                                            <div>
+                                                <p className="font-bold text-slate-800">{m.title}</p>
+                                                <p className="text-sm text-slate-500 mt-0.5 capitalize">{m.status}</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-extrabold text-slate-800">{(m.milestoneAmountETH ?? m.amount ?? 0).toFixed(4)} ETH</p>
+                                            {m.milestoneAmountINR && (
+                                                <p className="text-xs font-semibold text-slate-500 mt-0.5">₹{Number(m.milestoneAmountINR).toLocaleString('en-IN')}</p>
+                                            )}
                                         </div>
                                     </div>
                                 ))
@@ -110,12 +136,54 @@ function CampaignDetails() {
                         </div>
 
                         <h3 className="font-bold text-slate-800 mb-4 text-lg">Verification Proofs</h3>
-                        <div className="inline-flex items-center gap-2 p-4 w-full bg-slate-50 border border-slate-100 rounded-2xl group">
-                            <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl group-hover:bg-indigo-200 transition-colors">
-                                <FileCheck size={20} />
+                        {verifiedProofs.length ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {verifiedProofs.map((p) => {
+                                    const fileUrl = proofUrlFromCid(p.cid);
+                                    return (
+                                        <div key={p._id} className="flex flex-col justify-between p-5 bg-white border border-slate-100 rounded-2xl shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-300 group">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                                                        <FileCheck size={18} />
+                                                    </div>
+                                                    <Badge label="Verified Proof" className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold uppercase tracking-wide" />
+                                                </div>
+                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Milestone</p>
+                                                <p className="font-bold text-slate-800 text-sm mb-2">{p.milestoneTitle}</p>
+                                                {p.remarks && (
+                                                    <>
+                                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mt-3">Remarks</p>
+                                                        <p className="text-sm text-slate-600 italic mt-0.5 mb-4">"{p.remarks}"</p>
+                                                    </>
+                                                )}
+                                            </div>
+                                            {fileUrl && (
+                                                <a
+                                                    href={fileUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-50 border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl text-xs font-bold transition-all"
+                                                >
+                                                    View Document
+                                                    <ExternalLink size={14} />
+                                                </a>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
-                            <span className="font-bold text-slate-700">Proofs are available after NGO submission and admin verification.</span>
-                        </div>
+                        ) : (
+                            <div className="flex items-start gap-3 p-4 w-full bg-slate-50/50 border border-slate-100 rounded-2xl">
+                                <Info className="text-slate-400 mt-0.5 flex-shrink-0" size={18} />
+                                <div>
+                                    <p className="font-semibold text-slate-600 text-sm">No proofs verified yet</p>
+                                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                                        Verification proofs will become available here for donors to view once they are uploaded by the NGO and approved by the platform administrators.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Sidebar action */}

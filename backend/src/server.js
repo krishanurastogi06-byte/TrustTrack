@@ -9,6 +9,7 @@ const logger = require('./lib/logger');
 const db = require('./lib/db');
 const { startReconciliationJob } = require('./jobs/reconciliationJob');
 const blockchainService = require('./services/blockchainService');
+const socket = require('./lib/socket');
 
 const execAsync = promisify(exec);
 const basePort = Number(config.port) || 4000;
@@ -111,6 +112,8 @@ function listenOnPort(port) {
     const nextServer = http.createServer(app);
     nextServer.once('error', reject);
     nextServer.listen(port, () => {
+      // Initialize Socket.io
+      socket.init(nextServer);
       nextServer.removeListener('error', reject);
       resolve(nextServer);
     });

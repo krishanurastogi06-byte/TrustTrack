@@ -1,3 +1,4 @@
+
 import api from "../lib/axios";
 
 function normalizeAuthPayload(payload) {
@@ -50,10 +51,22 @@ export async function updateWallet(walletAddress) {
   return normalizeMePayload(res.data);
 }
 
+export async function updateProfile(profile) {
+  const res = await api.put("/auth/me", { profile });
+  return normalizeMePayload(res.data);
+}
+
+export async function changePassword(currentPassword, newPassword) {
+  const res = await api.put("/auth/me/password", { currentPassword, newPassword });
+  return res.data;
+}
+
 export default {
   login,
   register,
   refresh,
   me,
   updateWallet,
+  updateProfile,
+  changePassword,
 };

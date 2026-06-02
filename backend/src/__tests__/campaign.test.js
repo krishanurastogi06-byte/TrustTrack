@@ -296,7 +296,7 @@ describe('Campaign API', () => {
 
       const persistedA = await Milestone.findById(existingA._id);
       expect(persistedA.title).toBe('Phase A Updated');
-      expect(persistedA.amount).toBe(150);
+      expect(persistedA.milestoneAmountINR).toBe(150);
 
       const deletedB = await Milestone.findById(existingB._id);
       expect(deletedB).toBeNull();

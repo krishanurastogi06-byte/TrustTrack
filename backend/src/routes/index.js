@@ -11,6 +11,7 @@ const transactions = require('./transactions');
 const webhooks = require('./webhooks');
 const ngo = require('./ngo');
 const donors = require('./donors');
+const notifications = require('./notificationRoutes');
 
 const router = express.Router();
 
@@ -27,6 +28,7 @@ router.use('/api', transactions);
 router.use('/api/webhooks', webhooks);
 router.use('/api/ngo', ngo);
 router.use('/api/donor', donors);
+router.use('/api/notifications', notifications);
 
 // TODO: mount other route modules here (auth, campaigns, donations...)
 

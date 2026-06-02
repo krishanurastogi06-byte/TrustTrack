@@ -2,6 +2,7 @@ import AppRoutes from "./routes/AppRoutes";
 import { useEffect } from "react";
 import { useAuthStore } from "./store/useAuthStore";
 import authService from "./services/authService";
+import { Toaster } from "react-hot-toast";
 
 function App() {
   const token = useAuthStore((state) => state.accessToken);
@@ -38,7 +39,12 @@ function App() {
     };
   }, [token, setUser, logout, setInitialized]);
 
-  return <AppRoutes />;
+  return (
+    <>
+      <Toaster position="top-center" />
+      <AppRoutes />
+    </>
+  );
 }
 
 export default App;

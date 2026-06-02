@@ -29,4 +29,26 @@ const updateWalletSchema = z.object({
   walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid walletAddress').transform((value) => value.toLowerCase()),
 });
 
-module.exports = { registerSchema, loginSchema, refreshSchema, updateWalletSchema };
+const updateProfileSchema = z.object({
+  profile: z.object({
+    name: z.string().optional(),
+    organizationName: z.string().optional(),
+    phone: z.string().optional(),
+    bio: z.string().max(1000).optional(),
+    avatar: z.string().url().or(z.string().length(0)).optional(),
+  }),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
+});
+
+module.exports = { 
+  registerSchema, 
+  loginSchema, 
+  refreshSchema, 
+  updateWalletSchema, 
+  updateProfileSchema, 
+  changePasswordSchema 
+};

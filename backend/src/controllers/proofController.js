@@ -5,7 +5,7 @@ const { success, fail } = require('../lib/apiResponse');
 async function createProofForMilestone(req, res, next) {
   try {
     const { milestoneId } = req.params;
-    const { cid, filename, mimeType, size } = req.body;
+    const { cid, filename, mimeType, size, remarks } = req.body;
     const userId = req.user && req.user.sub;
 
     const milestone = await Milestone.findById(milestoneId).populate('campaign');
@@ -29,6 +29,7 @@ async function createProofForMilestone(req, res, next) {
       filename,
       mimeType,
       size,
+      remarks,
     });
 
     // Keep relationship and workflow status in sync.
@@ -46,6 +47,15 @@ async function createProofForMilestone(req, res, next) {
         milestoneId,
         cid,
       },
+    });
+
+    const notificationService = require('../services/notificationService');
+    const ngoEmail = req.user?.email || 'An NGO';
+    await notificationService.notifyAdmins({
+        title: "New Proof Uploaded",
+        message: `Proof submitted for milestone '${milestone.title || "Unknown"}' by ${ngoEmail}.`,
+        type: "info",
+        link: "/admin/proofs"
     });
 
     return success(res, {

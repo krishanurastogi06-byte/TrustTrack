@@ -78,18 +78,20 @@ async function createDonation(data) {
     throw err;
   }
 
-  if (!campaign.contractCampaignId) {
-    const err = new Error('Campaign is missing contractCampaignId');
-    err.status = 409;
-    err.code = 'CONTRACT_CAMPAIGN_ID_MISSING';
-    throw err;
-  }
+  if (blockchainService.isOnChainSyncEnabled()) {
+    if (!campaign.contractCampaignId) {
+      const err = new Error('Campaign is missing contractCampaignId');
+      err.status = 409;
+      err.code = 'CONTRACT_CAMPAIGN_ID_MISSING';
+      throw err;
+    }
 
-  if (data.contractCampaignId && String(data.contractCampaignId) !== String(campaign.contractCampaignId)) {
-    const err = new Error('Provided contractCampaignId does not match campaign mapping');
-    err.status = 409;
-    err.code = 'CONTRACT_CAMPAIGN_ID_MISMATCH';
-    throw err;
+    if (data.contractCampaignId && String(data.contractCampaignId) !== String(campaign.contractCampaignId)) {
+      const err = new Error('Provided contractCampaignId does not match campaign mapping');
+      err.status = 409;
+      err.code = 'CONTRACT_CAMPAIGN_ID_MISMATCH';
+      throw err;
+    }
   }
 
   console.log('[donationService] Campaign mapping for donation', {
@@ -107,12 +109,14 @@ async function createDonation(data) {
       err.code = 'TX_HASH_REQUIRED';
       throw err;
     }
-    const onchain = await blockchainService.assertConfirmedDonationTransaction({
-      txHash: data.txHash,
-      campaignId: campaign.contractCampaignId,
-      expectedAmountEth: normalizedAmountEth,
-    });
-    normalizedAmountEth = Number(onchain.amountEth);
+    if (blockchainService.isOnChainSyncEnabled()) {
+      const onchain = await blockchainService.assertConfirmedDonationTransaction({
+        txHash: data.txHash,
+        campaignId: campaign.contractCampaignId,
+        expectedAmountEth: normalizedAmountEth,
+      });
+      normalizedAmountEth = Number(onchain.amountEth);
+    }
   }
 
   let saved;

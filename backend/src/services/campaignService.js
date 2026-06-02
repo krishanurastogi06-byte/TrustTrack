@@ -8,26 +8,26 @@ async function createCampaign(data) {
   const fundingGoalINR = Number(data.fundingGoalINR ?? data.fundingGoal ?? 0);
   const fundingGoalETH = Number(data.fundingGoalETH ?? inrToEth(fundingGoalINR));
 
-  const campaign = new Campaign({
+  const campaignData = {
     ...data,
     fundingGoal: fundingGoalINR,
     fundingGoalINR,
     fundingGoalETH,
-    contractCampaignId: null, // Will be set by blockchain registration
-  });
+  };
 
   if (blockchainService.isOnChainSyncEnabled()) {
     console.log('[campaignService] Creating campaign, will register on-chain and auto-generate contractCampaignId');
     const registerResult = await blockchainService.registerCampaignOnChain({
-      ngoAddress: campaign.ngoWalletAddress,
+      ngoAddress: campaignData.ngoWalletAddress,
     });
     
     if (!registerResult.skipped) {
-      campaign.contractCampaignId = registerResult.contractCampaignId;
+      campaignData.contractCampaignId = registerResult.contractCampaignId;
       console.log('[campaignService] Campaign registered on-chain with contractCampaignId:', registerResult.contractCampaignId);
     }
   }
 
+  const campaign = new Campaign(campaignData);
   return campaign.save();
 }
 
@@ -92,7 +92,7 @@ async function syncCampaignMilestones(campaignId, milestones = []) {
     throw err;
   }
 
-  if (!campaign.contractCampaignId) {
+  if (blockchainService.isOnChainSyncEnabled() && !campaign.contractCampaignId) {
     const err = new Error('Campaign must have contractCampaignId before milestone sync');
     err.status = 409;
     err.code = 'CAMPAIGN_NOT_ONCHAIN';
@@ -125,7 +125,7 @@ async function syncCampaignMilestones(campaignId, milestones = []) {
       let contractMilestoneId = existingMilestone.contractMilestoneId;
 
       // If milestone doesn't have contractMilestoneId, register it on-chain
-      if (!contractMilestoneId && blockchainService.isOnChainSyncEnabled()) {
+      if (!contractMilestoneId && blockchainService.isOnChainSyncEnabled() && campaign.contractCampaignId) {
         console.log('[syncCampaignMilestones] Registering existing milestone on-chain');
         const registerResult = await blockchainService.registerMilestoneOnChain({
           contractCampaignId: campaign.contractCampaignId,
@@ -137,17 +137,23 @@ async function syncCampaignMilestones(campaignId, milestones = []) {
         }
       }
 
-      await Milestone.findByIdAndUpdate(item.id, {
+      const updateData = {
         title: item.title,
         description: item.description,
         amount: item.amount,
         milestoneAmountINR: item.milestoneAmountINR,
         milestoneAmountETH: item.milestoneAmountETH,
         amountETH: item.amount,
-        contractCampaignId: String(campaign.contractCampaignId),
-        contractMilestoneId,
         order: item.order,
-      });
+      };
+      if (campaign.contractCampaignId) {
+        updateData.contractCampaignId = String(campaign.contractCampaignId);
+      }
+      if (contractMilestoneId) {
+        updateData.contractMilestoneId = String(contractMilestoneId);
+      }
+
+      await Milestone.findByIdAndUpdate(item.id, updateData);
       keepIds.add(item.id);
       continue;
     }
@@ -156,7 +162,7 @@ async function syncCampaignMilestones(campaignId, milestones = []) {
     const generatedMilestoneId = new Milestone()._id;
     let contractMilestoneId = null;
 
-    if (blockchainService.isOnChainSyncEnabled()) {
+    if (blockchainService.isOnChainSyncEnabled() && campaign.contractCampaignId) {
       console.log('[syncCampaignMilestones] Creating new milestone and registering on-chain');
       const registerResult = await blockchainService.registerMilestoneOnChain({
         contractCampaignId: campaign.contractCampaignId,
@@ -168,7 +174,7 @@ async function syncCampaignMilestones(campaignId, milestones = []) {
       }
     }
 
-    const created = await Milestone.create({
+    const milestoneData = {
       _id: generatedMilestoneId,
       campaign: campaignId,
       title: item.title,
@@ -177,10 +183,16 @@ async function syncCampaignMilestones(campaignId, milestones = []) {
       milestoneAmountINR: item.milestoneAmountINR,
       milestoneAmountETH: item.milestoneAmountETH,
       amountETH: item.amount,
-      contractCampaignId: String(campaign.contractCampaignId),
-      contractMilestoneId,
       order: item.order,
-    });
+    };
+    if (campaign.contractCampaignId) {
+      milestoneData.contractCampaignId = String(campaign.contractCampaignId);
+    }
+    if (contractMilestoneId) {
+      milestoneData.contractMilestoneId = String(contractMilestoneId);
+    }
+
+    const created = await Milestone.create(milestoneData);
     keepIds.add(String(created._id));
   }
 

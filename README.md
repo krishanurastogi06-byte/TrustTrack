@@ -39,6 +39,14 @@ TrustTrack closes this gap by combining:
 - On-chain escrow and release execution in a smart contract.
 - Role-based governance for verification and payout decisions.
 
+### Key Features (Latest Updates)
+
+- **Real-time Event System**: Powered by Socket.io, users receive instant feedback on donations, proof verification, and fund releases.
+- **Robust Blockchain Sync**: Hybrid approach using ethers.js event listeners and a Webhook-driven reconciliation service for 100% transaction integrity.
+- **Automated NGO Onboarding**: Streamlined wallet connection and profile verification workflow.
+- **Milestone-based Escrow**: Funds are locked on-chain and only released to NGO wallets upon verified proof of work.
+- **Intelligent Port Management**: Backend includes collision detection and automatic fallback for smoother local development.
+
 ### Real-world problem statement
 
 In traditional donation flows, money is often transferred directly to an organization account before any measurable milestone is completed. This creates risk of misuse, weak accountability, and poor donor confidence.
@@ -169,7 +177,16 @@ Responsibilities:
 - Milestone is marked paid/released/completed in DB.
 - Release transaction is stored in transactions collection.
 
-12. Polygonscan visibility
+12. Real-time Notifications & UI Updates
+- Backend emits Socket.io events (`notification`, `campaign_update`) upon critical actions.
+- NGOs receive instant toast notifications for proof approvals or fund releases.
+- Donors see immediate updates to campaign progress bars upon donation confirmation.
+
+13. Automated Reconciliation & Webhooks
+- A background reconciliation job polls for pending transaction statuses.
+- The Webhook service receives external updates, ensuring the DB matches the on-chain state even if a frontend session was lost.
+
+14. Polygonscan visibility
 - Donor and admin can open tx hash on `https://amoy.polygonscan.com/tx/<txHash>`.
 - Donation and release become independently auditable.
 
@@ -228,7 +245,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    A[React + Vite Frontend] --> B[Express API]
+    A[React + Vite Frontend] <-->|Socket.io| B[Express API]
     B --> C[(MongoDB)]
     B --> D[Blockchain Service ethers.js]
     D --> E[Donation Smart Contract]
@@ -236,6 +253,7 @@ flowchart LR
     A --> G[MetaMask]
     G --> F
     B --> H[Reconciliation Job]
+    I[Webhook Service] --> B
     H --> F
     H --> C
 ```
@@ -244,14 +262,17 @@ flowchart LR
 
 Frontend:
 - Role-based dashboards for admin, NGO, donor.
+- **Real-time Updates**: Socket.io integration for instant notification toast and status refreshes.
 - Wallet connect and chain enforcement to Polygon Amoy.
 - Campaign creation, donation action, proof and release operations via API.
 
 Backend:
 - Auth, role middleware, validation, business services.
+- **Socket.io Server**: Manages real-time event broadcasting to connected clients.
+- **Webhook Integration**: Receives external transaction status updates for robust reconciliation.
 - Smart-contract registration and release orchestration.
 - Consistency checks between DB mappings and on-chain state.
-- Audit logging and transaction persistence.
+- Audit logging and transaction persistence using Winston.
 
 MongoDB:
 - Stores users, campaigns, milestones, donations, proofs, transactions, wallet summaries.
@@ -391,7 +412,7 @@ flowchart TB
 
     CampMgmt -->|Register Campaign| SmartContract
     MileMgmt -->|Register Milestone| SmartContract
-    DonEscrow -->|Donate (send value)| SmartContract
+    DonEscrow -->|"Donate (send value)"| SmartContract
     FundRelease -->|Release Funds| SmartContract
     SmartContract -->|TX Status| WalletSync
 ```
@@ -429,7 +450,7 @@ flowchart TD
     B --> C
     C --> D
     D -->|Yes| E
-    D -->|No (dev)| G
+    D -->|"No (dev)"| G
     E --> F
     F --> G
     G --> H
@@ -852,54 +873,32 @@ This Data Flow & System Flow Levels section ensures comprehensive understanding 
 
 ### Frontend
 
-- React 19
-  Why: Component-driven UI and role-specific dashboard development.
-- Vite
-  Why: Fast local development and optimized builds.
-- React Router
-  Why: Role-based routing for admin/ngo/donor portals.
-- Zustand
-  Why: Lightweight auth/session state persistence.
-- TanStack React Query
-  Why: API data caching, invalidation, and request state handling.
-- Axios
-  Why: API client with token injection and response normalization.
-- Ethers.js (frontend)
-  Why: Contract interaction for donation txs and wallet provider calls.
-- Wagmi + Viem (present in deps)
-  Why: Additional wallet/web3 integration capability.
-- Tailwind CSS
-  Why: Utility-first styling and fast UI iteration.
-- GSAP
-  Why: Animation support for richer UX where needed.
+- **React 19**: Component-driven UI and role-specific dashboard development.
+- **Vite**: Fast local development and optimized builds.
+- **Zustand**: Lightweight auth/session and global state persistence.
+- **TanStack React Query**: Efficient server-state management, caching, and background synchronization.
+- **GSAP**: Premium animations for a refined and interactive user experience.
+- **Socket.io Client**: Real-time event consumption for instant UI updates (notifications, status changes).
+- **Tailwind CSS**: Utility-first styling for fast UI iteration and consistency.
+- **Ethers.js / Wagmi / Viem**: Robust blockchain interaction layer for wallet connectivity and contract calls.
 
 ### Backend
 
-- Node.js + Express
-  Why: Structured REST API and middleware ecosystem.
-- MongoDB + Mongoose
-  Why: Flexible document models and relationship-like references.
-- JWT + bcryptjs
-  Why: Stateless auth and secure password hashing.
-- Zod
-  Why: Strict runtime validation for request payloads.
-- Multer
-  Why: File upload handling for proof assets.
-- IPFS HTTP Client
-  Why: Store proof files via IPFS-compatible gateway.
+- **Node.js + Express**: Structured REST API and middleware ecosystem.
+- **Socket.io Server**: Real-time bidirectional communication for live notifications.
+- **MongoDB + Mongoose**: Scalable document storage with flexible schema modeling.
+- **Winston + Morgan**: Professional-grade logging and request tracking.
+- **Zod**: Strict schema-based validation for request payloads and environments.
+- **ImageKit / IPFS Client**: Hybrid storage strategy for high-performance asset delivery and decentralized proofs.
+- **Multer**: Middleware for handling multipart/form-data (file uploads).
 
 ### Blockchain
 
-- Solidity 0.8.24
-  Why: Safe math defaults and modern EVM language features.
-- Hardhat
-  Why: Compile, deploy, local chain, and script tooling.
-- Ethers.js (backend)
-  Why: Provider, contract reads/writes, tx status verification.
-- Polygon Amoy
-  Why: Public testnet for realistic low-cost integration tests.
-- MetaMask
-  Why: User-side signing for donor donation transactions.
+- **Solidity 0.8.24**: Secure smart contract development with modern math safety.
+- **Hardhat**: Comprehensive development suite for local node, testing, and deployment scripts.
+- **Ethers.js (Backend)**: Orchestrate on-chain actions like campaign registration and fund release.
+- **Polygon Amoy**: Public testnet for realistic, low-cost integration and validation.
+- **MetaMask**: Industry-standard wallet provider for donor signing.
 
 ---
 
@@ -1190,71 +1189,6 @@ Use `.env` files in both backend and frontend projects.
 
 Important: Never commit real secrets. Rotate any leaked keys immediately.
 
-### Backend `.env`
-
-Required runtime variables:
-
-```env
-# App
-NODE_ENV=development
-PORT=4000
-MONGO_URI=<mongodb_connection_string>
-JWT_SECRET=<strong_random_secret>
-CORS_ORIGIN=<frontend_origin_optional>
-TRUST_PROXY=false
-
-# Blockchain runtime (Hardhat Local default, Amoy supported)
-DONATION_NETWORK=localhost
-ETHEREUM_RPC_URL=http://127.0.0.1:8545
-CHAIN_ID=31337
-DONATION_CONTRACT_ADDRESS=<deployed_contract_address>
-DEPLOYER_PRIVATE_KEY=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-DONATION_ADMIN_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-
-# Explorer and hardhat utilities
-ETHERSCAN_API_KEY=<polygonscan_or_etherscan_api_key>
-POLYGONSCAN_API_KEY=<polygonscan_api_key_optional>
-AMOY_RPC_URL=<optional_hardhat_network_rpc>
-POLYGON_AMOY_RPC_URL=<optional_alt_key>
-SEPOLIA_RPC_URL=<optional_if_using_sepolia>
-
-# Reconciliation
-ENABLE_RECONCILIATION=false
-RECONCILE_INTERVAL_MS=60000
-RECONCILE_BATCH_SIZE=25
-
-# Upload/IPFS
-IPFS_API_URL=https://api.pinata.cloud
-IPFS_API_KEY=<optional_provider_key>
-IPFS_SECRET=<optional_provider_secret>
-WEBHOOK_SECRET=<webhook_signing_secret>
-
-# Bootstrap admin
-ADMIN_EMAIL=<admin_email>
-ADMIN_PASSWORD=<admin_password>
-```
-
-### Frontend `.env`
-
-```env
-# Backend connection
-VITE_BACKEND_URL=http://localhost:4000
-VITE_API_BASE_URL=http://localhost:4000/api
-
-# Blockchain chain guard (Hardhat Local)
-VITE_CHAIN_ID=31337
-VITE_CHAIN_NAME=Hardhat Local
-VITE_CHAIN_RPC_URL=http://127.0.0.1:8545
-VITE_CHAIN_SYMBOL=ETH
-VITE_CHAIN_EXPLORER_URL=""
-
-# App display/config
-VITE_DONATION_CONTRACT=<deployed_contract_address>
-VITE_INR_PER_ETH=250000
-```
-
----
-
 ## 12) Local Setup
 
 ### Prerequisites
@@ -1394,14 +1328,27 @@ Set:
 - `VITE_DONATION_CONTRACT` to deployed address
 - `VITE_API_BASE_URL` to deployed backend base path
 
-### 4. Sync and audit on-chain mappings
+### 4. Sync and Migration Tools
+
+If you are migrating existing data or need to audit on-chain mappings:
 
 ```bash
 cd backend
+# Synchronize missing on-chain IDs with existing DB records
 npm run sync:onchain
+
+# [NEW] Migrate local/temporary IDs to contract-generated sequence IDs
+npm run migrate:contract-ids
+
+# [NEW] Reset database collections to sync with a fresh Hardhat node
+npm run db:reset
 ```
 
-### 5. Verify explorer visibility
+### 5. Role-Specific Testing
+For detailed instructions on testing the NGO wallet lifecycle and troubleshooting MetaMask, see:
+[NGO_WALLET_TESTING_GUIDE.md](frontend/NGO_WALLET_TESTING_GUIDE.md)
+
+### 6. Verify explorer visibility
 
 - Contract page: `https://amoy.polygonscan.com/address/<contractAddress>`
 - Donation tx: `https://amoy.polygonscan.com/tx/<donationTxHash>`
@@ -1450,15 +1397,43 @@ Checks:
 Fix:
 - Request faucet POL and retry.
 
-### 3. Wrong contract address
+### 3. Port Conflicts (EADDRINUSE)
+
+Symptoms:
+- Backend fails to start with "Port 4000 is already in use".
+- "Another backend instance is active (PID XXXX)" warning in logs.
+
+Checks:
+- Check for existing node processes on port 4000: `netstat -ano | findstr :4000` (Windows) or `lsof -i :4000` (Unix).
+- Look at the `.runtime/backend-dev.pid` file to see the last registered PID.
+
+Fix:
+- The backend automatically tries fallback ports (4001, 4002) if 4000 is busy.
+- To force kill the existing instance: `taskkill /PID <PID> /F` (Windows) or `kill -9 <PID>` (Unix).
+- Delete the `.runtime/` directory if state is corrupted.
+
+### 4. Wrong contract address
 
 Symptoms:
 - Contract read/write fails.
 - Donation UI says invalid contract address.
 
 Checks:
-- Backend `DONATION_CONTRACT_ADDRESS` matches deployed network.
 - Frontend `VITE_DONATION_CONTRACT` matches same address.
+
+### 5. Blockchain/Database Desync (Duplicate Key Error)
+
+Symptoms:
+- `E11000 duplicate key error` shown in logs or UI.
+- Failures when creating campaigns or milestones with IDs that "already exist".
+
+Checks:
+- Did you restart your Hardhat node (`npx hardhat node`) but keep MongoDB running?
+- Hardhat resets its internal counters, while MongoDB persists previous IDs.
+
+Fix:
+- Run `npm run db:reset` in the backend directory to zero-out stale database records.
+- This ensures your database state perfectly matches your fresh blockchain state.
 - Address has code on Amoy explorer.
 
 Fix:

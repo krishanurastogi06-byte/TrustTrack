@@ -32,30 +32,40 @@ function persistLocally(buffer, originalname) {
   return { cid, fileName, filePath };
 }
 
+const imagekit = require('../lib/imagekit');
+
 function uploadHandler(req, res, next) {
   upload(req, res, async function (err) {
     if (err) return next(err);
     if (!req.file) return fail(res, { status: 400, error: 'No file uploaded', code: 'FILE_REQUIRED' });
+
     try {
       const { buffer, originalname, mimetype, size } = req.file;
       let payload;
 
       try {
-        const added = await ipfsService.addBuffer(buffer, originalname);
-        const url = ipfsService.gatewayUrl(added.cid);
+        // Primary: ImageKit for high performance & CDN
+        const ikResponse = await imagekit.upload({
+          file: buffer,
+          fileName: toSafeFilename(originalname),
+          folder: "/profile_photos"
+        });
+
         payload = {
-          cid: added.cid,
-          path: added.path,
-          size: added.size,
-          url,
-          filename: originalname,
+          cid: ikResponse.url,
+          fileId: ikResponse.fileId,
+          url: ikResponse.url,
+          size: ikResponse.size,
+          filename: ikResponse.name,
           mimeType: mimetype,
-          storage: 'ipfs',
+          storage: 'imagekit',
         };
-      } catch (ipfsErr) {
+      } catch (ikErr) {
+        console.error('ImageKit Upload Error:', ikErr);
+        // Fallback: Local storage if ImageKit is unavailable
         const local = persistLocally(buffer, originalname);
         payload = {
-          cid: local.cid,
+          cid: `local://${local.fileName}`,
           path: local.fileName,
           size,
           url: `/api/uploads/local/${encodeURIComponent(local.fileName)}`,
@@ -65,7 +75,7 @@ function uploadHandler(req, res, next) {
         };
       }
 
-      return success(res, { status: 201, data: payload, extra: payload, message: 'File uploaded' });
+      return success(res, { status: 201, data: payload, extra: payload, message: 'File uploaded successfully' });
     } catch (e) {
       next(e);
     }

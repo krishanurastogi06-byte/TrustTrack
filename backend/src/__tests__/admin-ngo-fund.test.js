@@ -192,8 +192,8 @@ describe('Admin, NGO Verification, and Fund Release API', () => {
         .set('Authorization', `Bearer ${ngoToken}`)
         .send({
           title: 'Milestone One',
-          description: 'Initial milestone for release test',
-          amount: 1000,
+          amountETH: 1.0,
+          order: 1,
         });
 
       const milestoneId = milestoneRes.body.milestone._id;
@@ -219,12 +219,13 @@ describe('Admin, NGO Verification, and Fund Release API', () => {
           decision: 'approve',
           txHash: '0xabc123456789def0000000000000000000000000000000000000000000000001',
           remarks: 'Verified and released',
+          expectedNgoWalletAddress: ngoUser.walletAddress,
         });
 
       expect(releaseRes.status).toBe(200);
       expect(releaseRes.body.milestone.fundRequest.status).toBe('released');
       expect(releaseRes.body.milestone.status).toBe('completed');
-      expect(releaseRes.body.milestone.fundRequest.releasedAmount).toBe(1000);
+      expect(releaseRes.body.milestone.fundRequest.releasedAmount).toBe(1);
     });
 
     it('should reject request funds when milestone is not verified', async () => {
@@ -250,7 +251,7 @@ describe('Admin, NGO Verification, and Fund Release API', () => {
       const milestoneRes = await request(app)
         .post(`/api/campaigns/${campaignId}/milestones`)
         .set('Authorization', `Bearer ${ngoToken}`)
-        .send({ title: 'Milestone Pending', amount: 700 });
+        .send({ title: 'Milestone Pending', amountETH: 0.7, order: 1 });
 
       const milestoneId = milestoneRes.body.milestone._id;
 
@@ -298,14 +299,14 @@ describe('Admin, NGO Verification, and Fund Release API', () => {
           description:
             'Campaign used for relation integrity checks across milestone, proof, transaction, and donation entities.',
           category: 'relief',
-          fundingGoal: 9000,
+          fundingGoal: 25000000,
         });
       const campaignId = campaignRes.body.campaign._id;
 
       const milestoneRes = await request(app)
         .post(`/api/campaigns/${campaignId}/milestones`)
         .set('Authorization', `Bearer ${ngoToken}`)
-        .send({ title: 'Relation Milestone', amount: 1200 });
+        .send({ title: 'Relation Milestone', amountETH: 1.2, order: 1 });
       const milestoneId = milestoneRes.body.milestone._id;
 
       const proofRes = await request(app)

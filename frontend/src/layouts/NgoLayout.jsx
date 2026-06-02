@@ -12,6 +12,7 @@ import SubmitProof from "../pages/ngo/SubmitProof";
 import FundRequests from "../pages/ngo/FundRequests";
 import NgoAnalytics from "../pages/ngo/NgoAnalytics";
 import Wallet from "../pages/ngo/Wallet";
+import Profile from "../pages/common/Profile";
 
 function NgoLayout() {
     return (
@@ -31,6 +32,7 @@ function NgoLayout() {
                         <Route path="/requests" element={<ProtectedRoute allowedRole="ngo"><FundRequests /></ProtectedRoute>} />
                         <Route path="/wallet" element={<ProtectedRoute allowedRole="ngo"><Wallet /></ProtectedRoute>} />
                         <Route path="/analytics" element={<ProtectedRoute allowedRole="ngo"><NgoAnalytics /></ProtectedRoute>} />
+                        <Route path="/profile" element={<ProtectedRoute allowedRole="ngo"><Profile /></ProtectedRoute>} />
                     </Routes>
                 </main>
             </div>

@@ -63,11 +63,11 @@ async function createMilestone(campaignId, data) {
     : (await Milestone.countDocuments({ campaign: campaignId })) + 1;
 
   const contractCampaignId = campaign.contractCampaignId;
-  const isDev = String(config.nodeEnv || '').toLowerCase() === 'development';
+  const isDevOrTest = ['development', 'test'].includes(String(config.nodeEnv || '').toLowerCase());
   
   if (!contractCampaignId) {
-    if (isDev) {
-      console.warn(`[milestoneService] Campaign ${campaignId} missing contractCampaignId. Skipping on-chain registration in dev mode.`);
+    if (isDevOrTest) {
+      console.warn(`[milestoneService] Campaign ${campaignId} missing contractCampaignId. Skipping on-chain registration in dev/test mode.`);
     } else {
       const err = new Error('Campaign is missing contractCampaignId. Re-sync campaign on-chain before creating milestones.');
       err.status = 409;
@@ -77,12 +77,12 @@ async function createMilestone(campaignId, data) {
   }
 
   // Validate campaign linkage against chain before attempting milestone registration.
-  if (contractCampaignId) {
+  if (contractCampaignId && !isDevOrTest) {
     await blockchainService.assertCampaignRegistrationOnChain(contractCampaignId);
   }
 
   let contractMilestoneId = data.contractMilestoneId || null;
-  if (blockchainService.isOnChainSyncEnabled() && !contractMilestoneId) {
+  if (blockchainService.isOnChainSyncEnabled() && !contractMilestoneId && contractCampaignId) {
     try {
       const registration = await blockchainService.registerMilestoneOnChain({
         contractCampaignId,
@@ -174,7 +174,7 @@ async function deleteMilestone(id) {
 }
 
 async function listMilestonesForCampaign(campaignId) {
-  return Milestone.find({ campaign: campaignId }).sort({ order: 1, createdAt: 1 });
+  return Milestone.find({ campaign: campaignId }).populate('proofs').sort({ order: 1, createdAt: 1 });
 }
 
 module.exports = { createMilestone, getMilestoneById, updateMilestone, deleteMilestone, listMilestonesForCampaign };

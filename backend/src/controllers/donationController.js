@@ -1,5 +1,7 @@
 const donationService = require('../services/donationService');
 const { success, fail } = require('../lib/apiResponse');
+const Campaign = require('../models/Campaign');
+const notificationService = require('../services/notificationService');
 
 async function createDonation(req, res, next) {
   try {
@@ -57,6 +59,27 @@ async function confirmDonation(req, res, next) {
       entityId: created._id,
       metadata: { campaignId: req.body.campaignId, txHash: req.body.txHash },
     });
+
+    const campaign = await Campaign.findById(req.body.campaignId);
+    if (campaign) {
+      // Notify Donor
+      await notificationService.createNotification({
+        user: donorId,
+        title: "Donation Successful",
+        message: `Your donation of ${amountETH} ETH to '${campaign.title}' was successfully processed!`,
+        type: "success",
+        link: "/donor/donations"
+      });
+
+      // Notify NGO
+      await notificationService.createNotification({
+        user: campaign.ngo,
+        title: "New Donation Received",
+        message: `You received a new donation of ${amountETH} ETH for '${campaign.title}'.`,
+        type: "success",
+        link: "/ngo/campaigns"
+      });
+    }
 
     return success(res, { status: 201, data: created, legacyKey: 'donation', message: 'Donation confirmed' });
   } catch (err) {

@@ -10,6 +10,7 @@ import CampaignDetails from "../pages/donor/CampaignDetails";
 import MyDonations from "../pages/donor/MyDonations";
 import TransactionHistory from "../pages/donor/TransactionHistory";
 import Wallet from "../pages/donor/Wallet";
+import Profile from "../pages/common/Profile";
 
 function DonorLayout() {
     return (
@@ -27,6 +28,7 @@ function DonorLayout() {
                         <Route path="/donations" element={<ProtectedRoute allowedRole="donor"><MyDonations /></ProtectedRoute>} />
                         <Route path="/transactions" element={<ProtectedRoute allowedRole="donor"><TransactionHistory /></ProtectedRoute>} />
                         <Route path="/wallet" element={<ProtectedRoute allowedRole="donor"><Wallet /></ProtectedRoute>} />
+                        <Route path="/profile" element={<ProtectedRoute allowedRole="donor"><Profile /></ProtectedRoute>} />
                     </Routes>
                 </main>
             </div>

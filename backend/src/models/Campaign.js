@@ -23,6 +23,20 @@ const CampaignSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// pre-validate middleware to automatically populate fundingGoalINR and fundingGoalETH if missing
+CampaignSchema.pre('validate', function(next) {
+  if (this.fundingGoal != null) {
+    if (this.fundingGoalINR == null) {
+      this.fundingGoalINR = this.fundingGoal;
+    }
+    if (this.fundingGoalETH == null) {
+      const { inrToEth } = require('../lib/currency');
+      this.fundingGoalETH = inrToEth(this.fundingGoalINR);
+    }
+  }
+  next();
+});
+
 // text index for search
 CampaignSchema.index({ title: 'text', summary: 'text', description: 'text' });
 

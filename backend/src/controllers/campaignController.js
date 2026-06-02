@@ -45,6 +45,14 @@ async function createCampaign(req, res, next) {
       metadata: { ngoId: req.user?.sub },
     });
 
+    const notificationService = require('../services/notificationService');
+    await notificationService.notifyAdmins({
+        title: "New Campaign Created",
+        message: `A new campaign draft '${created.title}' has been submitted for review.`,
+        type: "info",
+        link: "/admin/campaigns"
+    });
+
     return success(res, { status: 201, data: created, legacyKey: 'campaign', message: 'Campaign created' });
   } catch (err) {
     next(err);
@@ -55,11 +63,11 @@ async function listCampaigns(req, res, next) {
   try {
     const page = Number(req.query.page || 1);
     const perPage = Math.min(Number(req.query.perPage || 10), 100);
-    const { search, category, ngoId } = req.query;
+    const { search, category, ngoId, status: queryStatus } = req.query;
 
-    // Public and donor-facing listings should only show admin-verified campaigns.
+    // Public and donor-facing listings should only show admin-verified campaigns by default.
     // NGO-specific listings can show all statuses for owner management.
-    const status = ngoId ? undefined : 'published';
+    const status = queryStatus ? queryStatus : (ngoId ? undefined : 'published');
 
     const { items, total } = await campaignService.findCampaigns({ page, perPage, search, category, ngoId, status });
     return success(res, {

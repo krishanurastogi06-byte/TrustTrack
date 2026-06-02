@@ -58,6 +58,11 @@ export async function fetchAdminCampaigns(params = {}) {
   return normalizeListPayload(res.data || {});
 }
 
+export async function fetchNgoCampaigns(params = {}) {
+  const res = await api.get("/campaigns", { params });
+  return normalizeListPayload(res.data || {});
+}
+
 export async function fetchCampaignById(id) {
   if (!id) throw new Error("campaign id is required");
   const res = await api.get(`/campaigns/${id}`);

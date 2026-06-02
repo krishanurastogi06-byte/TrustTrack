@@ -9,6 +9,7 @@ const auditLogService = require('../services/auditLogService');
 const fundRequestService = require('../services/fundRequestService');
 const campaignService = require('../services/campaignService');
 const blockchainService = require('../services/blockchainService');
+const notificationService = require('../services/notificationService');
 
 async function updateCampaignStateFromMilestones(campaignId) {
   if (!campaignId) return;
@@ -123,6 +124,16 @@ async function verifyNgo(req, res, next) {
       entityId: ngo._id,
       metadata: { verificationStatus: ngo.verificationStatus },
     });
+
+    if (status === 'approved') {
+        await notificationService.createNotification({
+            user: ngo._id,
+            title: "Account Verified",
+            message: "Your NGO account has been officially verified by the TrustTrack Admin!",
+            type: "success",
+            link: "/ngo"
+        });
+    }
 
     return success(res, {
       data: ngo,
@@ -283,6 +294,29 @@ async function releaseMilestoneFundsManual(req, res, next) {
       },
     });
 
+    const campaign = await Campaign.findById(milestone.campaign);
+    if (campaign) {
+      await notificationService.createNotification({
+        user: campaign.ngo,
+        title: "Funds Released",
+        message: `Funds have successfully been released for your milestone on campaign '${campaign.title}'.`,
+        type: "success",
+        link: "/ngo/wallet"
+      });
+      
+      // Notify donors of this campaign about milestone release
+      const uniqueDonors = await Donation.distinct("donor", { campaign: campaign._id, status: "confirmed" });
+      uniqueDonors.forEach(async (donorId) => {
+        await notificationService.createNotification({
+           user: donorId,
+           title: "Fund Tracking Update",
+           message: `A milestone for '${campaign.title}' was verified. The smart contract has deployed funds to the NGO!`,
+           type: "success",
+           link: "/donor/donations"
+        });
+      });
+    }
+
     return success(res, {
       data: milestone,
       legacyKey: 'milestone',
@@ -340,6 +374,14 @@ async function verifyCampaign(req, res, next) {
       metadata: { status: updated.status },
     });
 
+    await notificationService.createNotification({
+        user: updated.ngo,
+        title: "Campaign Approved",
+        message: `Your campaign '${updated.title}' has been approved and published to Donors!`,
+        type: "success",
+        link: "/ngo/campaigns"
+    });
+
     return success(res, {
       data: updated,
       legacyKey: 'campaign',
@@ -363,6 +405,14 @@ async function rejectCampaign(req, res, next) {
       entityType: 'Campaign',
       entityId: updated._id,
       metadata: { status: updated.status },
+    });
+
+    await notificationService.createNotification({
+        user: updated.ngo,
+        title: "Campaign Rejected",
+        message: `Your campaign '${updated.title}' was rejected.`,
+        type: "error",
+        link: "/ngo/campaigns"
     });
 
     return success(res, {
@@ -402,6 +452,14 @@ async function verifyProof(req, res, next) {
       },
     });
 
+    await notificationService.createNotification({
+      user: proof.uploader,
+      title: "Proof Verified",
+      message: `Your proof has been verified by the Admin.`,
+      type: "success",
+      link: "/ngo/campaigns"
+    });
+
     return success(res, { data: proof, message: 'Proof verified', legacyKey: 'data' });
   } catch (err) {
     next(err);
@@ -433,6 +491,14 @@ async function rejectProof(req, res, next) {
         newStatus: proof.status,
         remarks,
       },
+    });
+
+    await notificationService.createNotification({
+      user: proof.uploader,
+      title: "Proof Rejected",
+      message: `Your proof was rejected. ${remarks ? `Reason: ${remarks}` : ""}`,
+      type: "error",
+      link: "/ngo/campaigns"
     });
 
     return success(res, { data: proof, message: 'Proof rejected', legacyKey: 'data' });

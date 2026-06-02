@@ -47,6 +47,7 @@ const listCampaignsQuerySchema = z.object({
   search: z.string().min(1).max(100).optional(),
   category: z.string().max(100).optional(),
   ngoId: z.string().regex(objectId, 'Invalid ngoId').optional(),
+  status: z.enum(['draft', 'published', 'completed', 'cancelled']).optional(),
 });
 
 module.exports = {

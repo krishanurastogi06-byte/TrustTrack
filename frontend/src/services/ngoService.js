@@ -81,6 +81,19 @@ export const ngoService = {
       throw error;
     }
   },
+
+  /**
+   * Get public list of verified NGOs
+   */
+  async fetchPublicNgos() {
+    try {
+      const response = await apiClient.get(`${API_BASE}/public/list`);
+      return response.data?.data || response.data?.items;
+    } catch (error) {
+      console.error('Failed to fetch public NGOs:', error);
+      throw error;
+    }
+  },
 };
 
 export default ngoService;

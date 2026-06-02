@@ -36,4 +36,23 @@ const MilestoneSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// pre-validate middleware to automatically populate amountETH, milestoneAmountETH and milestoneAmountINR if missing
+MilestoneSchema.pre('validate', function(next) {
+  const { inrToEth, ethToInr } = require('../lib/currency');
+  if (this.amount != null) {
+    if (this.amountETH == null) this.amountETH = this.amount;
+    if (this.milestoneAmountETH == null) this.milestoneAmountETH = this.amount;
+    if (this.milestoneAmountINR == null) this.milestoneAmountINR = ethToInr(this.amount);
+  } else if (this.amountETH != null) {
+    this.amount = this.amountETH;
+    if (this.milestoneAmountETH == null) this.milestoneAmountETH = this.amountETH;
+    if (this.milestoneAmountINR == null) this.milestoneAmountINR = ethToInr(this.amountETH);
+  } else if (this.milestoneAmountINR != null) {
+    this.milestoneAmountETH = inrToEth(this.milestoneAmountINR);
+    this.amountETH = this.milestoneAmountETH;
+    this.amount = this.milestoneAmountETH;
+  }
+  next();
+});
+
 module.exports = mongoose.model('Milestone', MilestoneSchema);

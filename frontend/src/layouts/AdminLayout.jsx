@@ -11,6 +11,7 @@ import NgoCampaignDetails from "../pages/admin/NgoCampaignDetails";
 import CampaignMonitoring from "../pages/admin/CampaignMonitoring";
 import ProofVerification from "../pages/admin/ProofVerification";
 import AuditLogs from "../pages/admin/AuditLogs";
+import Profile from "../pages/common/Profile";
 
 function AdminLayout() {
     return (
@@ -28,7 +29,8 @@ function AdminLayout() {
                         <Route path="/verified-ngos/:id" element={<ProtectedRoute allowedRole="admin"><NgoCampaignDetails /></ProtectedRoute>} />
                         <Route path="/campaigns" element={<ProtectedRoute allowedRole="admin"><CampaignMonitoring /></ProtectedRoute>} />
                         <Route path="/proofs" element={<ProtectedRoute allowedRole="admin"><ProofVerification /></ProtectedRoute>} />
-                        <Route path="/logs" element={<ProtectedRoute allowedRole="admin"><AuditLogs /></ProtectedRoute>} />
+                        <Route path="/profile" element={<ProtectedRoute allowedRole="admin"><Profile /></ProtectedRoute>} />
+                        {/* <Route path="/logs" element={<ProtectedRoute allowedRole="admin"><AuditLogs /></ProtectedRoute>} /> */}
                     </Routes>
                 </main>
             </div>

@@ -276,7 +276,12 @@ async function registerMilestoneOnChain({ contractCampaignId, amountEth }) {
   }
 
   if (!contractCampaignId) {
-    const err = new Error('contractCampaignId is required for milestone sync');
+    if (String(config.nodeEnv || '').toLowerCase() === 'development') {
+      console.warn('[blockchainService] Milestone registration skipped: missing contractCampaignId in development mode.');
+      return { skipped: true, reason: 'missing_contract_campaign_id' };
+    }
+
+    const err = new Error('contractCampaignId is required for milestone sync. Please register the campaign on blockchain first.');
     err.status = 400;
     err.code = 'INVALID_CAMPAIGN_ID';
     throw err;
@@ -695,6 +700,25 @@ async function releaseMilestoneFunds(payload) {
 }
 
 async function releaseMilestoneFundsOnChain({ milestoneId, campaignId, ngoAddress, amountEth }) {
+  if (!isOnChainSyncEnabled()) {
+    return {
+      skipped: true,
+      campaignChainId: String(campaignId || '1'),
+      milestoneChainId: String(milestoneId || '1'),
+      ngoAddress: ngoAddress,
+      toAddress: ngoAddress,
+      releasedAmountWei: ethers.parseEther(String(amountEth || '0')).toString(),
+      releasedAmountEth: String(amountEth || '0'),
+      txHash: '0xabc123456789def0000000000000000000000000000000000000000000000001',
+      fromAddress: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
+      from: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
+      network: 31337,
+      blockNumber: 1,
+      confirmations: 1,
+      receipt: {},
+    };
+  }
+
   if (!milestoneId) {
     const err = new Error('milestoneId is required to release milestone funds');
     err.status = 400;

@@ -30,6 +30,8 @@ const UserSchema = new mongoose.Schema({
     name: String,
     organizationName: String,
     phone: String,
+    bio: String,
+    avatar: String,
   },
   wallet: { type: mongoose.Schema.Types.ObjectId, ref: 'Wallet' },
   isActive: { type: Boolean, default: true },

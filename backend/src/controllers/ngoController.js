@@ -202,6 +202,22 @@ async function getWalletBalance(req, res, next) {
   }
 }
 
+async function listPublicNgos(req, res, next) {
+  try {
+    const ngos = await User.find({ role: 'ngo', verificationStatus: 'approved' })
+      .select('profile email _id createdAt');
+
+    return success(res, {
+      data: ngos,
+      legacyKey: 'items',
+      message: 'Verified NGOs retrieved',
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+
 module.exports = { 
   requestMilestoneFunds, 
   getNgoProfile,
@@ -209,4 +225,5 @@ module.exports = {
   getFundsSummary,
   getWallet,
   getWalletBalance,
+  listPublicNgos,
 };

@@ -21,6 +21,16 @@ export function useAdminCampaigns(params = {}, options = {}) {
   });
 }
 
+export function useNgoCampaigns(params = {}, options = {}) {
+  return useQuery({
+    queryKey: ["ngo-campaigns", params],
+    queryFn: () => campaignService.fetchNgoCampaigns(params),
+    placeholderData: keepPreviousData,
+    retry: 1,
+    ...options,
+  });
+}
+
 export function useCampaign(id, options = {}) {
   return useQuery({
     queryKey: ["campaign", id],

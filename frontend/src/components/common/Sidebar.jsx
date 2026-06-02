@@ -103,10 +103,10 @@ function Sidebar({ links }) {
                         <div className="flex justify-between items-start mb-6 pb-6 border-b border-indigo-500/10">
                             <div className="flex items-center gap-4">
                                 <div className="w-14 h-14 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 border border-white shrink-0 overflow-hidden shadow-sm">
-                                    {user?.avatar ? <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" /> : <User size={28} />}
+                                    {user?.profile?.avatar ? <img src={user.profile.avatar} alt="Avatar" className="w-full h-full object-cover" /> : <User size={28} />}
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-xl font-bold text-slate-800 tracking-tight leading-tight">{user?.name || "User_Name"}</span>
+                                    <span className="text-xl font-bold text-slate-800 tracking-tight leading-tight">{user?.profile?.name || user?.email || "User"}</span>
                                     <span className="text-[13px] font-bold text-slate-400 uppercase tracking-wide">{role || "Role"}</span>
                                 </div>
                             </div>
