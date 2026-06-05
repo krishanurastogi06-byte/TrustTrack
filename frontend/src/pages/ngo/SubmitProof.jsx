@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Card from "../../components/ui/Card";
 import { UploadCloud } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
@@ -12,21 +12,31 @@ import Badge from "../../components/ui/Badge";
 import { useCampaigns, useCampaignMilestones } from "../../hooks/useCampaigns";
 import { useCreateProof, useMyProofs, useUploadProof } from "../../hooks/useProofs";
 import { useAuthStore } from "../../store/useAuthStore";
+import { useLocation } from "react-router-dom";
 
 function SubmitProof() {
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState("");
     const [submitSuccess, setSubmitSuccess] = useState("");
     const user = useAuthStore((state) => state.user);
+    const location = useLocation();
+
+    const defaultCampaignId = location.state?.campaignId || "";
+    const defaultMilestoneId = location.state?.milestoneId || "";
 
     const {
         register,
         control,
         handleSubmit,
         watch,
+        setValue,
         formState: { errors, isValid },
     } = useForm({
         resolver: zodResolver(submitProofSchema),
+        defaultValues: {
+            campaignId: defaultCampaignId,
+            milestoneId: defaultMilestoneId,
+        },
         mode: "onChange",
     });
 
@@ -40,6 +50,21 @@ function SubmitProof() {
     const campaigns = campaignsData?.items || [];
     const milestones = milestonesData?.items || [];
     const proofs = myProofsData?.items || myProofsData?.data || [];
+
+    useEffect(() => {
+        if (defaultCampaignId) {
+            setValue("campaignId", defaultCampaignId);
+        }
+    }, [defaultCampaignId, setValue]);
+
+    useEffect(() => {
+        if (defaultMilestoneId && milestones.length > 0) {
+            const exists = milestones.some(m => (m._id || m.id) === defaultMilestoneId);
+            if (exists) {
+                setValue("milestoneId", defaultMilestoneId);
+            }
+        }
+    }, [defaultMilestoneId, milestones, setValue]);
 
     const proofHeaders = ["Campaign", "Milestone", "Document", "Status", "Submitted On"];
     const proofRows = proofs.map((proof) => {

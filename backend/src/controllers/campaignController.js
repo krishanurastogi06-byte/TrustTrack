@@ -46,9 +46,10 @@ async function createCampaign(req, res, next) {
     });
 
     const notificationService = require('../services/notificationService');
+    const ngoName = ngo.profile?.organizationName || ngo.profile?.name || ngo.email;
     await notificationService.notifyAdmins({
         title: "New Campaign Created",
-        message: `A new campaign draft '${created.title}' has been submitted for review.`,
+        message: `Campaign: ${ngoName}, ${created.title}, and ${created.fundingGoalETH} ETH`,
         type: "info",
         link: "/admin/campaigns"
     });

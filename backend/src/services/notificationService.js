@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const Notification = require("../models/Notification");
 const socket = require("../lib/socket");
 
 /**

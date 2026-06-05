@@ -79,6 +79,14 @@ async function confirmDonation(req, res, next) {
         type: "success",
         link: "/ngo/campaigns"
       });
+
+      // Notify Admin
+      await notificationService.notifyAdmins({
+        title: "Donation Deposited in Escrow",
+        message: `${amountETH} ETH stored in Smart Contract Balance of '${campaign.title}'`,
+        type: "info",
+        link: "/admin/campaigns"
+      });
     }
 
     return success(res, { status: 201, data: created, legacyKey: 'donation', message: 'Donation confirmed' });

@@ -23,9 +23,11 @@ async function register(req, res, next) {
     // Notify admins if it's an NGO
     if (user.role === 'ngo') {
         const notificationService = require('../services/notificationService');
+        const ngoName = user.profile?.organizationName || user.profile?.name || user.email;
+        const walletText = user.walletAddress ? "available" : "not available";
         await notificationService.notifyAdmins({
             title: "New NGO Registration",
-            message: `A new NGO (${user.profile?.organizationName || user.email}) has registered and is pending verification.`,
+            message: `NGO: ${ngoName}, and Wallet Address ${walletText}`,
             type: "info",
             link: "/admin/ngos"
         });

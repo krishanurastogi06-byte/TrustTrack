@@ -2,7 +2,7 @@ import Table from "../../components/ui/Table";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
-import { Flag, Pencil, Trash2 } from "lucide-react";
+import { Flag, Pencil, Trash2, Activity } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCampaigns, useDeleteCampaign } from "../../hooks/useCampaigns";
 import { useAuthStore } from "../../store/useAuthStore";
@@ -62,10 +62,17 @@ function Campaigns() {
         <span className="font-medium text-slate-600">{formatEth(item.fundingGoalETH)}</span>,
         <span className="font-bold text-slate-600">{formatEth(item.raisedETH)}</span>,
         <Badge
-            label={item.status}
-            type={item.status === "published" ? "success" : item.status === "completed" ? "default" : "warning"}
+            label={item.status === "published" ? "Published" : item.status === "cancelled" ? "Rejected" : item.status === "completed" ? "Completed" : "Pending Verification"}
+            type={item.status === "published" ? "success" : item.status === "cancelled" ? "danger" : item.status === "completed" ? "indigo" : "warning"}
         />,
         <div className="flex gap-2">
+            <Button
+                type="outline"
+                className="!px-3 !py-1.5 text-xs !bg-indigo-50 hover:!bg-indigo-100 !text-indigo-700 !border-indigo-100"
+                onClick={() => navigate(`/ngo/campaigns/${item._id || item.id}/progress`)}
+            >
+                <Activity size={14} /> Progress
+            </Button>
             <Button
                 type="secondary"
                 className="!px-3 !py-1.5 text-xs"

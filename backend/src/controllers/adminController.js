@@ -255,6 +255,32 @@ async function releaseMilestoneFunds(req, res, next) {
     const transaction = updated?.$locals?.releaseTransaction || null;
     const warning = updated?.$locals?.releaseWarning || null;
 
+    if (req.body.decision === 'approve' && updated) {
+      const campaign = await Campaign.findById(updated.campaign);
+      if (campaign) {
+        const releasedAmount = updated.fundRequest?.releasedAmount || updated.amountETH || updated.amount || 0;
+        await notificationService.createNotification({
+          user: campaign.ngo,
+          title: "Funds Released",
+          message: `Funds of ${releasedAmount} ETH have successfully been released for your milestone '${updated.title}' on campaign '${campaign.title}'.`,
+          type: "success",
+          link: "/ngo/wallet"
+        });
+
+        // Notify donors of this campaign about milestone release
+        const uniqueDonors = await Donation.distinct("donor", { campaign: campaign._id, status: "confirmed" });
+        for (const donorId of uniqueDonors) {
+          await notificationService.createNotification({
+             user: donorId,
+             title: "Fund Tracking Update",
+             message: `Milestone '${updated.title}' for '${campaign.title}' was verified. The smart contract has deployed funds to the NGO!`,
+             type: "success",
+             link: "/donor/donations"
+          });
+        }
+      }
+    }
+
     return success(res, {
       data: updated,
       legacyKey: 'milestone',
@@ -296,25 +322,26 @@ async function releaseMilestoneFundsManual(req, res, next) {
 
     const campaign = await Campaign.findById(milestone.campaign);
     if (campaign) {
+      const releasedAmount = blockchain?.releasedAmountEth || milestone?.amountETH || milestone?.amount || 0;
       await notificationService.createNotification({
         user: campaign.ngo,
         title: "Funds Released",
-        message: `Funds have successfully been released for your milestone on campaign '${campaign.title}'.`,
+        message: `Funds of ${releasedAmount} ETH have successfully been released for your milestone '${milestone.title}' on campaign '${campaign.title}'.`,
         type: "success",
         link: "/ngo/wallet"
       });
       
       // Notify donors of this campaign about milestone release
       const uniqueDonors = await Donation.distinct("donor", { campaign: campaign._id, status: "confirmed" });
-      uniqueDonors.forEach(async (donorId) => {
+      for (const donorId of uniqueDonors) {
         await notificationService.createNotification({
            user: donorId,
            title: "Fund Tracking Update",
-           message: `A milestone for '${campaign.title}' was verified. The smart contract has deployed funds to the NGO!`,
+           message: `Milestone '${milestone.title}' for '${campaign.title}' was verified. The smart contract has deployed funds to the NGO!`,
            type: "success",
            link: "/donor/donations"
         });
-      });
+      }
     }
 
     return success(res, {
@@ -459,6 +486,35 @@ async function verifyProof(req, res, next) {
       type: "success",
       link: "/ngo/campaigns"
     });
+
+    if (proof.milestone) {
+      const campaignId = proof.milestone.campaign;
+      const campaign = await Campaign.findById(campaignId);
+      if (campaign) {
+        const milestones = await Milestone.find({ campaign: campaignId }).sort({ order: 1, createdAt: 1 });
+        const idx = milestones.findIndex(m => String(m._id) === String(proof.milestone._id));
+        const phaseIndex = idx !== -1 ? idx + 1 : 1;
+
+        const getOrdinal = (n) => {
+          const s = ["th", "st", "nd", "rd"];
+          const v = n % 100;
+          return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        };
+        const ordinalPhase = getOrdinal(phaseIndex);
+
+        // Notify Donors who donated to this campaign
+        const uniqueDonors = await Donation.distinct("donor", { campaign: campaignId, status: "confirmed" });
+        for (const donorId of uniqueDonors) {
+          await notificationService.createNotification({
+            user: donorId,
+            title: "Campaign Phase Completed",
+            message: `This campaign complete it's ${ordinalPhase} phase.`,
+            type: "success",
+            link: `/campaigns/${campaign.slug || campaign._id}`
+          });
+        }
+      }
+    }
 
     return success(res, { data: proof, message: 'Proof verified', legacyKey: 'data' });
   } catch (err) {

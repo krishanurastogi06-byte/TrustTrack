@@ -8,13 +8,16 @@ async function createProofForMilestone(req, res, next) {
     const { cid, filename, mimeType, size, remarks } = req.body;
     const userId = req.user && req.user.sub;
 
-    const milestone = await Milestone.findById(milestoneId).populate('campaign');
+    const milestone = await Milestone.findById(milestoneId).populate({
+      path: 'campaign',
+      populate: { path: 'ngo' }
+    });
     if (!milestone) {
       return fail(res, { status: 404, error: 'Milestone not found', code: 'MILESTONE_NOT_FOUND' });
     }
 
     // Only the NGO who owns the campaign (or admin) can submit proof
-    if (String(milestone.campaign.ngo) !== String(userId) && req.user.role !== 'admin') {
+    if (String(milestone.campaign?.ngo?._id || milestone.campaign?.ngo) !== String(userId) && req.user.role !== 'admin') {
       return fail(res, {
         status: 403,
         error: 'Not allowed to submit proof for this milestone',
@@ -50,10 +53,16 @@ async function createProofForMilestone(req, res, next) {
     });
 
     const notificationService = require('../services/notificationService');
-    const ngoEmail = req.user?.email || 'An NGO';
+    const campaign = milestone.campaign;
+    const ngo = campaign?.ngo;
+    const ngoName = ngo?.profile?.organizationName || ngo?.profile?.name || ngo?.email || 'Unknown NGO';
+    const campaignName = campaign?.title || 'Unknown Campaign';
+    const milestoneName = milestone.title || 'Unknown Milestone';
+    const amount = `${milestone.amountETH || milestone.amount || 0} ETH`;
+
     await notificationService.notifyAdmins({
         title: "New Proof Uploaded",
-        message: `Proof submitted for milestone '${milestone.title || "Unknown"}' by ${ngoEmail}.`,
+        message: `Proof: ${campaignName}, ${ngoName}, ${milestoneName}, and ${amount}`,
         type: "info",
         link: "/admin/proofs"
     });

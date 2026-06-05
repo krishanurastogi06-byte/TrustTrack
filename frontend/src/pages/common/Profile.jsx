@@ -170,7 +170,7 @@ function Profile() {
     const navItems = [
         { id: "overview", label: "General Details", icon: User },
         { id: "security", label: "Security", icon: ShieldCheck },
-        ...(role === "ngo" ? [{ id: "campaigns", label: "Missions", icon: Heart }] : []),
+        ...(role === "ngo" ? [{ id: "campaigns", label: "Campaigns", icon: Heart }] : []),
         ...(role === "ngo" || role === "donor" ? [{ id: "wallet", label: "Wallet", icon: Wallet }] : [])
     ];
 
@@ -415,7 +415,7 @@ function Profile() {
                         <div className="space-y-6 md:space-y-8">
                             <div className="flex flex-col md:flex-row items-center md:items-end justify-between gap-4 mb-4 text-center md:text-left">
                                 <div>
-                                    <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">Active Missions</h2>
+                                    <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">Active Campaigns</h2>
                                     <p className="text-[10px] md:text-sm text-slate-400 font-bold uppercase tracking-widest mt-1">Real-time Campaign Oversight</p>
                                 </div>
                                 <Link to="/ngo/create" className="w-full md:w-auto px-6 py-3 bg-indigo-600 text-white rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
@@ -449,7 +449,7 @@ function Profile() {
                                                             {Number(camp.fundingGoalETH).toFixed(3)} ETH
                                                         </span>
                                                     </div>
-                                                    <Link to={`/campaigns/${camp._id}`} className="p-2 md:p-3 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg md:rounded-xl transition-all">
+                                                    <Link to={`/ngo/campaigns/${camp._id || camp.id}/progress`} className="p-2 md:p-3 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg md:rounded-xl transition-all">
                                                         <ArrowUpRight size={18} md:size={20} />
                                                     </Link>
                                                 </div>
@@ -461,7 +461,7 @@ function Profile() {
                                         <div className="w-16 h-16 md:w-20 md:h-20 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 mx-auto mb-6">
                                             <Activity size={32} className="md:w-10 md:h-10" />
                                         </div>
-                                        <h3 className="text-lg md:text-xl font-black text-slate-800 mb-2">No Active Missions</h3>
+                                        <h3 className="text-lg md:text-xl font-black text-slate-800 mb-2">No Active Campaigns</h3>
                                         <p className="text-xs md:text-sm text-slate-400 font-medium mb-8 max-w-xs mx-auto">Initiate a blockchain-verified campaign to start generating social impact.</p>
                                         <Button type="primary" className="!rounded-xl md:!rounded-2xl px-10 md:px-12 bg-indigo-600">Initialize First Mission</Button>
                                     </div>
